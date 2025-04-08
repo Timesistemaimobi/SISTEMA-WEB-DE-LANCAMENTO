@@ -1,0 +1,31 @@
+{% extends "base.html" %} {% block title %}Importação SIENGE - Lote (Seleção){%
+endblock %} {% block content %}
+<h1>Importação SIENGE - Lote</h1>
+<p>Selecione a planilha Excel (.xlsx ou .xls) do loteamento.</p>
+
+<form
+  action="{{ url_for('upload_file_sienge_lote') }}"
+  method="post"
+  enctype="multipart/form-data"
+  class="tool-form"
+>
+  <div class="form-group">
+    <label for="arquivo_entrada">Planilha de Entrada:</label>
+    <input
+      type="file"
+      id="arquivo_entrada"
+      name="arquivo_entrada"
+      accept=".xlsx, .xls"
+      required
+    />
+    <small
+      >Certifique-se que a planilha contém as colunas: ETAPA, QUADRA, LOTE,
+      ÁREA(M2), FRAÇÃO IDEAL (após padronização).</small
+    >
+  </div>
+
+  <button type="submit" class="full-width" style="margin-top: 25px">
+    Carregar Etapas para Mapeamento
+  </button>
+</form>
+{% endblock %}

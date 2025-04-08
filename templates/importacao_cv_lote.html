@@ -1,0 +1,86 @@
+{% extends "base.html" %} {% block title %}Importação CV - Loteamento{% endblock
+%} {% block content %}
+<h1>Importação CV - Loteamento</h1>
+<p>
+  Esta ferramenta gera um arquivo CSV específico para importação de loteamentos,
+  baseado em uma planilha Excel.
+</p>
+<p>
+  Preencha as informações do empreendimento e selecione a planilha de entrada.
+</p>
+
+<form
+  action="{{ url_for('importacao_cv_lote_tool') }}"
+  method="post"
+  enctype="multipart/form-data"
+  class="tool-form"
+>
+  <h2>Informações do Empreendimento</h2>
+
+  <div class="form-group">
+    <label for="nome_empreendimento">Nome do Empreendimento:</label>
+    <input
+      type="text"
+      id="nome_empreendimento"
+      name="Nome do Empreendimento"
+      required
+    />
+  </div>
+
+  <div class="form-group">
+    <label for="sigla">Sigla:</label>
+    <input type="text" id="sigla" name="Sigla" required />
+  </div>
+
+  <div class="form-group">
+    <label for="empresa">Empresa:</label>
+    <input type="text" id="empresa" name="Empresa" required />
+  </div>
+
+  <div class="form-group">
+    <label for="tipo_empreendimento">Tipo (Empreendimento):</label>
+    <input
+      type="text"
+      id="tipo_empreendimento"
+      name="Tipo"
+      value="Loteamento"
+      placeholder="Ex: Loteamento"
+    />
+    <small>Padrão: Loteamento</small>
+  </div>
+
+  <div class="form-group">
+    <label for="segmento">Segmento:</label>
+    <input
+      type="text"
+      id="segmento"
+      name="Segmento"
+      value="Residencial"
+      placeholder="Ex: Residencial, Comercial"
+    />
+    <small>Padrão: Residencial</small>
+  </div>
+
+  <h2>Arquivo de Entrada</h2>
+  <div class="form-group">
+    <label for="arquivo_entrada"
+      >Selecione a planilha Excel (.xlsx, .xls):</label
+    >
+    <input
+      type="file"
+      id="arquivo_entrada"
+      name="arquivo_entrada"
+      accept=".xlsx, .xls"
+      required
+    />
+    <small
+      >Certifique-se que a planilha contém colunas como QUADRA, LOTE, ÁREA(M2),
+      FRAÇÃO IDEAL, TIPO, CONFRONTANTES.</small
+    >
+  </div>
+
+  <button type="submit" class="full-width" style="margin-top: 25px">
+    Gerar Arquivo CSV
+  </button>
+</form>
+{% endblock %}

@@ -1,0 +1,532 @@
+/* static/styles.css */
+
+/* 1. Definir Variáveis de Cor (CSS Custom Properties) - COM SUAS MUDANÇAS */
+:root {
+  /* Modo Claro (Padrão) - Com suas cores */
+  --bg-color: #f4f7f6;
+  --text-color: #333333; /* << VOLTADO para #333 para legibilidade, ajuste se PRECISAR ser verde */
+  --container-bg: #ffffff;
+  --container-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
+  --border-color: #e0e0e0;
+  --border-color-strong: #cccccc;
+  --primary-color: #68c900; /* Verde VCA */
+  /* Ligeiramente escurecido para hover, senão não há efeito visual */
+  --primary-hover-color: #5aae02; /* << AJUSTADO para hover */
+  --secondary-color: #2a3f54; /* << Mantido Azul Escuro para títulos e navbar (melhor contraste) */
+  --accent-color: #73879c; /* << Mantido Cinza Azulado para botões secundários/upload */
+  --accent-hover-color: #5a6f84; /* << Mantido hover do accent */
+  --link-color: var(--primary-color);
+  --link-hover-color: var(--primary-hover-color);
+  --navbar-bg: var(--secondary-color); /* Azul escuro */
+  --navbar-link-color: #e7e7e7;
+  --navbar-link-hover-bg: var(--primary-color); /* Fundo verde no hover */
+  --navbar-link-hover-color: #ffffff; /* Texto branco no hover */
+  --table-header-bg: #f8f9fa;
+  --table-header-color: #444444;
+  --table-row-odd-bg: #fdfdfd;
+  --table-row-hover-bg: #f1f1f1;
+  --input-bg: #ffffff;
+  --input-border: var(--border-color-strong);
+  --input-focus-border: var(--primary-color);
+  --input-focus-shadow: rgba(104, 201, 0, 0.3); /* Sombra verde no focus */
+  --input-placeholder-color: #aaa;
+  --button-text-color: #ffffff;
+  --flash-error-bg: #f8d7da;
+  --flash-error-text: #721c24;
+  --flash-error-border: #f5c6cb;
+  --flash-warning-bg: #fff3cd;
+  --flash-warning-text: #856404;
+  --flash-warning-border: #ffeeba;
+  --flash-info-bg: #d1ecf1;
+  --flash-info-text: #0c5460;
+  --flash-info-border: #bee5eb;
+  --flash-success-bg: #d4edda;
+  --flash-success-text: #155724;
+  --flash-success-border: #c3e6cb;
+}
+
+/* 2. Definir Variáveis para Modo Escuro - Com seus ajustes */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg-color: #1a1d21;
+    --text-color: #d1d5db; /* Cinza claro para texto */
+    --container-bg: #252a30;
+    --container-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
+    --border-color: #4b5563;
+    --border-color-strong: #6b7280;
+    /* Mantendo primário e secundário (títulos) definidos no :root claro para consistência */
+    /* --primary-color: #68c900;  (já definido) */
+    /* --primary-hover-color: #5aae02; (já definido) */
+    /* --secondary-color: #68c900; (usando o verde) << AJUSTADO ABAIXO */
+    --secondary-color: #86d92b; /* Verde um pouco mais claro para títulos no escuro */
+    --accent-color: #6b7280;
+    --accent-hover-color: #9ca3af;
+    --link-color: var(--primary-color);
+    --link-hover-color: var(--primary-hover-color);
+    --navbar-bg: #1f2428; /* Navbar bem escura */
+    --navbar-link-color: #a0aec0;
+    --navbar-link-hover-bg: var(--primary-color);
+    --navbar-link-hover-color: #ffffff;
+    --table-header-bg: #374151;
+    --table-header-color: #e5e7eb;
+    --table-row-odd-bg: #20252b;
+    --table-row-hover-bg: #313840;
+    --input-bg: #374151;
+    --input-border: var(--border-color);
+    --input-focus-border: var(--primary-color);
+    --input-focus-shadow: rgba(
+      104,
+      201,
+      0,
+      0.4
+    ); /* Sombra verde mais visível */
+    --input-placeholder-color: #9ca3af;
+    /* Flash messages escuras */
+    --flash-error-bg: #58151c;
+    --flash-error-text: #f8d7da;
+    --flash-error-border: #a04f5b;
+    --flash-warning-bg: #664d03;
+    --flash-warning-text: #fff3cd;
+    --flash-warning-border: #b89f4c;
+    --flash-info-bg: #0c343d;
+    --flash-info-text: #d1ecf1;
+    --flash-info-border: #57919e;
+    --flash-success-bg: #0a361f;
+    --flash-success-text: #d4edda;
+    --flash-success-border: #4a8c5a;
+  }
+
+  /* Ajustes específicos modo escuro */
+  input[type="file"]::file-selector-button {
+    background-color: var(--accent-color);
+    color: var(--button-text-color); /* Garante texto branco */
+    border: 1px solid var(--border-color-strong);
+  }
+  input[type="file"]::file-selector-button:hover {
+    background-color: var(--accent-hover-color);
+  }
+}
+
+/* 3. Animação de Entrada (Fade-in + Slide-up suave) */
+@keyframes fadeInSlideUp {
+  from {
+    opacity: 0;
+    transform: translateY(15px); /* Começa ligeiramente abaixo */
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* 4. Estilos Gerais e Aplicação de Variáveis e Transições */
+
+body {
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+    Oxygen, Ubuntu, Cantarell, "Open Sans", "Helvetica Neue", sans-serif;
+  margin: 0;
+  padding-top: 75px; /* Aumenta espaço para navbar + sombra */
+  background-color: var(--bg-color);
+  color: var(--text-color);
+  line-height: 1.6;
+  /* Transição suave para modo claro/escuro */
+  transition: background-color 0.3s ease-in-out, color 0.3s ease-in-out;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+/* Menu de Navegação com Transições */
+nav.navbar {
+  background-color: var(--navbar-bg);
+  padding: 0 25px;
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  z-index: 1000;
+  box-shadow: 0 3px 6px rgba(0, 0, 0, 0.15); /* Sombra um pouco mais pronunciada */
+  height: 60px;
+  transition: background-color 0.3s ease-in-out;
+}
+nav.navbar ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  height: 100%;
+  overflow-x: auto;
+  white-space: nowrap;
+}
+nav.navbar .logo-container img {
+  max-height: 38px;
+  margin-right: 25px;
+  vertical-align: middle;
+  transition: transform 0.2s ease-in-out;
+}
+nav.navbar .logo-container img:hover {
+  transform: scale(1.05);
+} /* Efeito sutil na logo */
+nav.navbar li {
+  margin-right: 15px;
+}
+nav.navbar li:last-child {
+  margin-right: 0;
+}
+nav.navbar a {
+  color: var(--navbar-link-color);
+  text-decoration: none;
+  padding: 8px 14px; /* Aumenta um pouco o padding */
+  border-radius: 5px; /* Bordas mais arredondadas */
+  /* Transição aplicada a múltiplas propriedades */
+  transition: background-color 0.2s ease-in-out, color 0.2s ease-in-out,
+    transform 0.15s ease-in-out, box-shadow 0.2s ease-in-out;
+  display: inline-block;
+  font-size: 0.9em;
+  position: relative; /* Necessário para pseudo-elementos se usados */
+  will-change: transform; /* Otimização para transform */
+}
+nav.navbar a:hover,
+nav.navbar a.active {
+  background-color: var(--navbar-link-hover-bg);
+  color: var(--navbar-link-hover-color);
+  transform: translateY(-2px); /* Levanta um pouco no hover/active */
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1); /* Sombra sutil no item ativo/hover */
+}
+
+/* Container Principal com Animação */
+main.container {
+  background-color: var(--container-bg);
+  padding: 25px 35px; /* Aumenta padding lateral */
+  border-radius: 10px; /* Mais arredondado */
+  box-shadow: var(--container-shadow);
+  max-width: 1100px;
+  margin: 30px auto; /* Mais margem */
+  border: 1px solid var(--border-color);
+  /* Aplica a animação */
+  animation: fadeInSlideUp 0.6s ease-out forwards;
+  /* Transição para modo escuro */
+  transition: background-color 0.3s ease-in-out, border-color 0.3s ease-in-out,
+    box-shadow 0.3s ease-in-out;
+}
+
+/* Títulos com Transição */
+h1,
+h2,
+h3 {
+  color: var(--secondary-color);
+  margin-top: 1.2em;
+  margin-bottom: 0.7em;
+  line-height: 1.3;
+  transition: color 0.3s ease-in-out; /* Transição de cor */
+}
+h1 {
+  text-align: center;
+  font-size: 1.9em;
+  border-bottom: 1px solid var(--border-color);
+  padding-bottom: 12px;
+  transition: border-color 0.3s ease-in-out;
+}
+h2 {
+  font-size: 1.5em;
+}
+h3 {
+  font-size: 1.25em;
+}
+
+/* Parágrafos */
+p {
+  margin-bottom: 1.1em;
+}
+small {
+  opacity: 0.8;
+  font-size: 0.85em;
+} /* Estilo para small */
+
+/* Formulários com Transições */
+.form-group {
+  margin-bottom: 20px;
+}
+label {
+  display: block;
+  margin-bottom: 8px;
+  font-weight: 600;
+  color: var(--text-color);
+  font-size: 0.95em;
+  transition: color 0.3s ease-in-out;
+}
+input[type="text"],
+input[type="file"],
+input[list],
+select {
+  width: 100%;
+  padding: 11px 14px; /* Aumenta padding */
+  border: 1px solid var(--input-border);
+  border-radius: 6px; /* Mais arredondado */
+  box-sizing: border-box;
+  font-size: 1em;
+  background-color: var(--input-bg);
+  color: var(--text-color);
+  /* Transição completa */
+  transition: border-color 0.25s ease-in-out, box-shadow 0.25s ease-in-out,
+    background-color 0.3s ease-in-out, color 0.3s ease-in-out;
+}
+input::placeholder {
+  color: var(--input-placeholder-color);
+  font-style: italic;
+  transition: color 0.3s ease-in-out;
+}
+input[type="text"]:focus,
+input[type="file"]:focus,
+input[list]:focus,
+select:focus {
+  border-color: var(--input-focus-border);
+  box-shadow: 0 0 0 3px var(--input-focus-shadow); /* Sombra mais pronunciada */
+  outline: none;
+}
+input[type="file"] {
+  padding: 9px 14px;
+}
+input[type="file"]::file-selector-button {
+  padding: 9px 16px;
+  margin-right: 12px;
+  background-color: var(--accent-color);
+  color: var(--button-text-color);
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: background-color 0.2s ease-in-out, transform 0.15s ease-in-out; /* Adiciona transição */
+}
+input[type="file"]::file-selector-button:hover {
+  background-color: var(--accent-hover-color);
+  transform: scale(1.03); /* Efeito de leve aumento */
+}
+input[type="checkbox"] {
+  margin-right: 8px;
+  vertical-align: middle;
+  width: 17px;
+  height: 17px;
+  accent-color: var(--primary-color);
+  cursor: pointer;
+}
+label.checkbox-label {
+  display: inline-flex;
+  align-items: center;
+  font-weight: normal;
+  color: var(--text-color);
+  cursor: pointer;
+  transition: color 0.3s ease-in-out;
+}
+
+/* Botões com Transições e Efeitos */
+button[type="submit"],
+input[type="submit"],
+.button-link {
+  display: inline-block;
+  background-color: var(--primary-color);
+  color: var(--button-text-color);
+  padding: 12px 28px; /* Mais padding */
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 1.05em;
+  font-weight: 600; /* Mais negrito */
+  text-align: center;
+  text-decoration: none;
+  /* Transição completa */
+  transition: background-color 0.2s ease-in-out, transform 0.15s ease-in-out,
+    box-shadow 0.2s ease-in-out;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.15);
+  will-change: transform, box-shadow; /* Otimização */
+}
+button[type="submit"]:hover,
+input[type="submit"]:hover,
+.button-link:hover {
+  background-color: var(--primary-hover-color); /* Cor ligeiramente diferente */
+  box-shadow: 0 5px 10px rgba(0, 0, 0, 0.18); /* Sombra maior no hover */
+  transform: translateY(-3px); /* Levanta mais */
+}
+button[type="submit"]:active,
+input[type="submit"]:active,
+.button-link:active {
+  transform: translateY(-1px); /* Pressiona levemente */
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1); /* Sombra menor no clique */
+}
+button[type="submit"].full-width,
+input[type="submit"].full-width {
+  display: block;
+  width: 100%;
+}
+
+/* Tabelas com Transições */
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 25px 0;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+  border: 1px solid var(--border-color);
+  transition: border-color 0.3s ease-in-out;
+  overflow: hidden; /* Para border-radius funcionar com a tabela */
+  border-radius: 8px; /* Bordas arredondadas na tabela */
+}
+th,
+td {
+  border-width: 0 0 1px 0; /* Apenas borda inferior */
+  border-style: solid;
+  border-color: var(--border-color);
+  padding: 14px 18px; /* Mais padding */
+  text-align: left;
+  vertical-align: middle;
+  transition: border-color 0.3s ease-in-out, background-color 0.2s ease-in-out; /* Transição no hover */
+}
+th {
+  background-color: var(--table-header-bg);
+  font-weight: 600;
+  color: var(--table-header-color);
+  font-size: 0.95em;
+  white-space: nowrap;
+  border-bottom-width: 2px;
+  border-bottom-color: var(--border-color-strong);
+}
+tbody tr:nth-child(odd) {
+  background-color: var(--table-row-odd-bg);
+}
+tbody tr:hover {
+  background-color: var(--table-row-hover-bg);
+}
+/* Remove borda inferior da última linha */
+tbody tr:last-child td {
+  border-bottom-width: 0;
+}
+
+/* Mensagens Flash com Transição (só se mudar dinamicamente) */
+.flash-messages {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 25px 0;
+}
+.flash-messages li {
+  padding: 15px 20px;
+  margin-bottom: 15px;
+  border-radius: 6px;
+  border: 1px solid transparent;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+  transition: background-color 0.3s ease-in-out, color 0.3s ease-in-out,
+    border-color 0.3s ease-in-out;
+}
+.flash-messages .error {
+  background-color: var(--flash-error-bg);
+  color: var(--flash-error-text);
+  border-color: var(--flash-error-border);
+}
+.flash-messages .warning {
+  background-color: var(--flash-warning-bg);
+  color: var(--flash-warning-text);
+  border-color: var(--flash-warning-border);
+}
+.flash-messages .info {
+  background-color: var(--flash-info-bg);
+  color: var(--flash-info-text);
+  border-color: var(--flash-info-border);
+}
+.flash-messages .success {
+  background-color: var(--flash-success-bg);
+  color: var(--flash-success-text);
+  border-color: var(--flash-success-border);
+}
+
+/* Links com Transição */
+a {
+  color: var(--link-color);
+  text-decoration: none;
+  transition: color 0.2s ease-in-out, text-decoration 0.2s ease-in-out;
+}
+a:hover {
+  color: var(--link-hover-color);
+  text-decoration: underline;
+}
+.cancel-link {
+  display: inline-block;
+  text-align: center;
+  margin-top: 20px;
+  color: var(--text-color);
+  opacity: 0.85;
+  font-size: 0.9em;
+  transition: color 0.2s ease-in-out, opacity 0.2s ease-in-out;
+}
+.cancel-link:hover {
+  color: var(--link-hover-color);
+  opacity: 1;
+}
+
+/* Responsividade (mantida) */
+@media (max-width: 992px) {
+  main.container {
+    max-width: 95%;
+    padding: 20px;
+  }
+  nav.navbar {
+    padding: 0 15px;
+  }
+}
+@media (max-width: 768px) {
+  h1 {
+    font-size: 1.6em;
+  }
+  h2 {
+    font-size: 1.3em;
+  }
+  th,
+  td {
+    padding: 10px 12px;
+    font-size: 0.9em;
+  } /* Ajuste padding tabela */
+  button[type="submit"],
+  input[type="submit"],
+  .button-link {
+    font-size: 1em;
+    padding: 10px 20px;
+  }
+  nav.navbar ul {
+    justify-content: flex-start;
+  }
+}
+@media (max-width: 576px) {
+  body {
+    padding-top: 60px;
+  } /* Ajuste padding */
+  nav.navbar {
+    height: 55px;
+    padding: 0 10px;
+  } /* Ajuste altura */
+  nav.navbar ul {
+    height: 55px;
+  }
+  nav.navbar .logo-container img {
+    max-height: 30px;
+    margin-right: 10px;
+  }
+  nav.navbar a {
+    font-size: 0.8em;
+    padding: 6px 8px;
+  } /* Reduz fonte/padding menu */
+  main.container {
+    padding: 15px;
+    margin: 20px auto;
+  }
+  h1 {
+    font-size: 1.5em;
+  }
+  th,
+  td {
+    padding: 8px 10px;
+    font-size: 0.85em;
+  } /* Ajuste padding tabela */
+}

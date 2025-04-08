@@ -1,0 +1,108 @@
+{% extends "base.html" %} {% block title %}Mapeamento Tipologias - CV{%
+endblock%} {% block styles %} {% endblock %} {% block content %}
+<h1>Mapeamento de Tipologias - Importação CV</h1>
+<p>
+  Projeto detectado como:
+  <strong>{% if is_casa_project %}CASA{% else %}APARTAMENTO{% endif %}</strong>
+</p>
+<p>
+  Para cada 'Tipo' encontrado na planilha, selecione ou digite o código da
+  tipologia correspondente nos campos abaixo.
+</p>
+<p>
+  Se uma opção pré-definida não servir, digite diretamente o código desejado no
+  campo (Ex: "45", "CUSTOM-01").
+</p>
+
+<form action="{{ url_for('process_file_cv') }}" method="post">
+  <table>
+    <thead>
+      <tr>
+        <th class="tipo-original-col">Tipo (Planilha)</th>
+        <th class="padrao-col">Código Tipologia Padrão</th>
+        <th class="pcd-col">Código Tipologia PCD</th>
+        <th class="col-superior superior-col">
+          Código Tipologia Superior (Apt > 6)
+        </th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for tipo in tipos_unicos %}
+      <tr>
+        <td><strong>{{ tipo }}</strong></td>
+        <td>
+          <!-- Usando datalist para sugestão + digitação livre -->
+          <input
+            list="padrao-list-{{ loop.index }}"
+            id="tipo_{{ tipo }}_padrao"
+            name="tipo_{{ tipo }}_padrao"
+            placeholder="Selecione ou digite código"
+            autocomplete="off"
+          />
+          <datalist id="padrao-list-{{ loop.index }}">
+            {% for key, value in tipologias_padrao.items() %} {# Mostra a chave
+            (descrição) e o valor (código) como sugestão #}
+            <option value="{{ key }}">{{ key }} (Código: {{ value }})</option>
+            {% endfor %} {# Adiciona os códigos como opções diretas também #} {%
+            for value in tipologias_padrao.values() %}
+            <option value="{{ value }}"></option>
+            {% endfor %}
+          </datalist>
+        </td>
+        <td>
+          <input
+            list="pcd-list-{{ loop.index }}"
+            id="tipo_{{ tipo }}_pcd"
+            name="tipo_{{ tipo }}_pcd"
+            placeholder="Selecione ou digite código"
+            autocomplete="off"
+          />
+          <datalist id="pcd-list-{{ loop.index }}">
+            {% for key, value in tipologias_pcd.items() %}
+            <option value="{{ key }}">{{ key }} (Código: {{ value }})</option>
+            {% endfor %} {% for value in tipologias_pcd.values() %}
+            <option value="{{ value }}"></option>
+            {% endfor %}
+          </datalist>
+        </td>
+        <td class="col-superior">
+          {% if not is_casa_project %}
+          <input
+            list="superior-list-{{ loop.index }}"
+            id="tipo_{{ tipo }}_superior"
+            name="tipo_{{ tipo }}_superior"
+            placeholder="Selecione ou digite código"
+            autocomplete="off"
+          />
+          <datalist id="superior-list-{{ loop.index }}">
+            {% for key, value in tipologias_superior.items() %}
+            <option value="{{ key }}">{{ key }} (Código: {{ value }})</option>
+            {% endfor %} {% for value in tipologias_superior.values() %}
+            <option value="{{ value }}"></option>
+            {% endfor %}
+          </datalist>
+          {% else %}
+          <span style="color: #999">N/A (Projeto CASA)</span>
+          {% endif %}
+        </td>
+      </tr>
+      {% else %}
+      <tr>
+        <td colspan="4" style="text-align: center; padding: 20px; color: #888">
+          Nenhum tipo único encontrado para mapear.
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  {% if tipos_unicos %} {# Só mostra o botão se houver tipos para mapear #}
+  <button type="submit" style="margin-top: 25px">Gerar Planilha CSV</button>
+  {% endif %}
+</form>
+
+<a href="{{ url_for('importacao_cv_index') }}" class="cancel-link"
+  >Voltar e cancelar (perder mapeamento)</a
+>
+
+{% endblock %}

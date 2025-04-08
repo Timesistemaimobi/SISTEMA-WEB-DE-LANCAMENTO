@@ -1,0 +1,69 @@
+{% extends "base.html" %} {# Usa a variável tool_name passada pelo Flask, ou
+'SIENGE' como padrão #} {% block title %}Mapeamento Etapas - {{ tool_name |
+default('SIENGE') }}{% endblock %} {% block content %}
+<h1>Mapeamento Etapas - {{ tool_name | default('SIENGE') }}</h1>
+<p>
+  Para cada "Etapa" encontrada na planilha original (coluna da esquerda),
+  informe o "Código Interno" correspondente utilizado no SIENGE (coluna da
+  direita).
+</p>
+<p>
+  Deixar o campo "Código Interno" vazio significa que as linhas com aquela etapa
+  não terão um código de empreendimento associado.
+</p>
+
+{# Aviso se nenhuma etapa foi encontrada #} {% if not etapas_unicas %}
+<div class="flash-messages">
+  <li class="warning">
+    Nenhuma etapa única foi encontrada na coluna 'ETAPA' do arquivo carregado.
+    Verifique a planilha original. Você pode tentar gerar o arquivo mesmo assim,
+    mas a coluna 'EMPREENDIMENTO' ficará vazia.
+  </li>
+</div>
+{% endif %} {# O action do formulário usa a variável process_url passada pelo
+Flask #}
+<form action="{{ process_url }}" method="post" class="tool-form">
+  <table>
+    <thead>
+      <tr>
+        <th style="width: 40%">Etapa (Planilha Original)</th>
+        <th>Código Interno (SIENGE)</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for etapa in etapas_unicas %}
+      <tr>
+        <td><strong>{{ etapa }}</strong></td>
+        <td>
+          {# O name ainda usa a etapa original para fácil recuperação no backend
+          #}
+          <input
+            type="text"
+            name="etapa_{{ etapa }}"
+            placeholder="Digite o código interno aqui"
+            autocomplete="off"
+          />
+        </td>
+      </tr>
+      {% else %} {# Não precisa de mensagem aqui se já avisou acima #} {#
+      <tr>
+        <td colspan="2" style="text-align: center; padding: 20px; color: #888">
+          Nenhuma etapa para mapear.
+        </td>
+      </tr>
+      #} {% endfor %}
+    </tbody>
+  </table>
+
+  {# Mostra botão sempre, mesmo sem etapas, caso o usuário queira gerar arquivo
+  vazio #}
+  <button type="submit" class="full-width" style="margin-top: 25px">
+    Gerar Planilha de Importação (.xls)
+  </button>
+</form>
+
+{# O link de cancelar usa a variável cancel_url passada pelo Flask #}
+<a href="{{ cancel_url }}" class="cancel-link" style="margin-top: 15px"
+  >Voltar e selecionar outro arquivo</a
+>
+{% endblock %}

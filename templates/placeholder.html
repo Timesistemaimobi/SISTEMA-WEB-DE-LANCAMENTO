@@ -1,0 +1,34 @@
+{% extends "base.html" %} {% block title %}{{ tool_name }}{% endblock %} {%
+block content %}
+<div style="text-align: center; padding: 40px 0">
+  <h1>{{ tool_name }}</h1>
+  <p style="font-size: 1.1em; color: #555">
+    🚧 Esta ferramenta ainda está em desenvolvimento. 🚧
+  </p>
+  <p style="margin-top: 30px">
+    <a
+      href="{{ url_for('home') }}"
+      class="button-link"
+      style="
+        text-decoration: none;
+        background-color: #777;
+        color: white;
+        padding: 10px 20px;
+        border-radius: 5px;
+      "
+      >Voltar para a página inicial</a
+    >
+  </p>
+</div>
+{% endblock %} {% block styles %}
+<style>
+  /* Estilo opcional para o botão de voltar */
+  .button-link {
+    display: inline-block;
+    transition: background-color 0.2s ease;
+  }
+  .button-link:hover {
+    background-color: #555 !important; /* Usa !important para sobrescrever inline se houver */
+  }
+</style>
+{% endblock %}

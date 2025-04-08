@@ -1,0 +1,68 @@
+{% extends "base.html" %} {% block title %}Importação CV{% endblock %} {% block
+content %}
+<h1>Importação CV - Unidades</h1>
+<p>
+  Preencha as informações do empreendimento e selecione a planilha Excel (.xlsx)
+  para iniciar.
+</p>
+
+<form
+  action="{{ url_for('upload_file_cv') }}"
+  method="post"
+  enctype="multipart/form-data"
+>
+  <h2>Informações do Empreendimento</h2>
+
+  <div class="form-group">
+    <label for="nome_empreendimento">Nome do Empreendimento:</label>
+    <input
+      type="text"
+      id="nome_empreendimento"
+      name="Nome do Empreendimento"
+      required
+    />
+  </div>
+
+  <div class="form-group">
+    <label for="sigla">Sigla:</label>
+    <input type="text" id="sigla" name="Sigla" required />
+  </div>
+
+  <div class="form-group">
+    <label for="empresa">Empresa:</label>
+    <input type="text" id="empresa" name="Empresa" required />
+  </div>
+
+  <div class="form-group">
+    <label for="tipo_empreendimento">Tipo (Empreendimento):</label>
+    <input type="text" id="tipo_empreendimento" name="Tipo" />
+  </div>
+
+  <div class="form-group">
+    <label for="segmento">Segmento:</label>
+    <input type="text" id="segmento" name="Segmento" />
+  </div>
+
+  <div class="form-group">
+    <label for="vaga_por_numero" class="checkbox-label">
+      <input type="checkbox" id="vaga_por_numero" name="vaga_por_numero" />
+      Interpretar Garagem por Número(s) (Ex: "01", "01 e 02", "1,2")? (Se
+      desmarcado, usa lógica de metragem/contagem padrão)
+    </label>
+  </div>
+
+  <h2 style="margin-top: 30px">Arquivo de Entrada</h2>
+  <div class="form-group">
+    <label for="arquivo_entrada">Selecione a planilha Excel (.xlsx):</label>
+    <input
+      type="file"
+      id="arquivo_entrada"
+      name="arquivo_entrada"
+      accept=".xlsx"
+      required
+    />
+  </div>
+
+  <button type="submit">Carregar Arquivo e Mapear Tipologias</button>
+</form>
+{% endblock %}

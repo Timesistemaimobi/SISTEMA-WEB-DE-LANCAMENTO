@@ -1,0 +1,44 @@
+{% extends "base.html" %} {% block title %}Formatador - Incorporação{% endblock
+%} {% block content %}
+<h1>Formatador - Incorporação</h1>
+<p>
+  Esta ferramenta processa uma planilha Excel para identificar blocos/quadras e
+  organizar os dados.
+</p>
+<ol>
+  <li>Identifica linhas começando com "QUADRA" ou "BLOCO" (coluna A).</li>
+  <li>Adiciona uma coluna "Bloco" com o número extraído dessas linhas.</li>
+  <li>Remove as linhas originais "QUADRA" / "BLOCO".</li>
+  <li>Remove o cabeçalho original (se houver).</li>
+  <li>Salva o resultado em um novo arquivo .xlsx.</li>
+</ol>
+
+<form
+  action="{{ url_for('formatador_incorporacao_tool') }}"
+  method="post"
+  enctype="multipart/form-data"
+  class="tool-form"
+>
+  <h2>Arquivo de Entrada</h2>
+  <div class="form-group">
+    <label for="arquivo_entrada"
+      >Selecione a planilha Excel (.xlsx, .xls):</label
+    >
+    <input
+      type="file"
+      id="arquivo_entrada"
+      name="arquivo_entrada"
+      accept=".xlsx, .xls"
+      required
+    />
+    <small
+      >A ferramenta espera encontrar os delimitadores "QUADRA X" ou "BLOCO Y" na
+      primeira coluna (A).</small
+    >
+  </div>
+
+  <button type="submit" class="full-width" style="margin-top: 25px">
+    Processar e Baixar Planilha Formatada (.xlsx)
+  </button>
+</form>
+{% endblock %}

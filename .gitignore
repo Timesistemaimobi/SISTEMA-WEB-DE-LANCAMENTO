@@ -1,0 +1,28 @@
+# Ambiente Virtual
+venv/
+*.pyenv
+
+# Arquivos compilados Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Arquivos de configuração local/segredos
+.env
+config.py
+instance/
+*.pem
+*.key
+
+# Pasta de Uploads (geralmente não versionada)
+uploads/
+
+# Arquivos de SO
+.DS_Store
+Thumbs.db
+
+# Arquivos de IDEs
+.idea/
+.vscode/
+*.sublime-project
+*.sublime-workspace

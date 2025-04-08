@@ -1,0 +1,5 @@
+Flask>=2.0
+pandas
+openpyxl
+Pillow
+python-dotenv # Bom para gerenciar configurações como a SECRET_KEY

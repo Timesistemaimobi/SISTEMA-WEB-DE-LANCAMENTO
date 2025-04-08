@@ -1,0 +1,55 @@
+{% extends "base.html" %} {% block title %}Formatador - Lote{% endblock %} {%
+block content %}
+<h1>Formatador - Lote</h1>
+<p>
+  Esta ferramenta processa uma planilha de loteamento para padronizar dados e
+  adicionar informações.
+</p>
+<ol>
+  <li>
+    Identifica linhas "QUADRA X" / "BLOCO Y" e cabeçalhos ("LOTE", "TIPO", etc.)
+    após elas.
+  </li>
+  <li>Adiciona/Formata coluna "QUADRA" (com valor numérico se possível).</li>
+  <li>
+    Formata colunas de medidas (Área, Testada, Fundo, Laterais) para "XX,XX
+    m/m²".
+  </li>
+  <li>
+    Adiciona prefixo "LT " à coluna Lote e outras especificadas, se necessário.
+  </li>
+  <li>Adiciona coluna "ETAPA" com valor fixo 1.</li>
+  <li>Constrói coluna "CONFRONTANTES".</li>
+  <li>Calcula e adiciona coluna "FRAÇÃO IDEAL".</li>
+  <li>Reordena colunas e salva como novo arquivo .xlsx com cabeçalho.</li>
+</ol>
+
+<form
+  action="{{ url_for('formatador_lote_tool') }}"
+  method="post"
+  enctype="multipart/form-data"
+  class="tool-form"
+>
+  <h2>Arquivo de Entrada</h2>
+  <div class="form-group">
+    <label for="arquivo_entrada"
+      >Selecione a planilha Excel (.xlsx, .xls):</label
+    >
+    <input
+      type="file"
+      id="arquivo_entrada"
+      name="arquivo_entrada"
+      accept=".xlsx, .xls"
+      required
+    />
+    <small
+      >A ferramenta espera encontrar "QUADRA/BLOCO" na coluna A e um cabeçalho
+      com "LOTE", "ÁREA(M2)", etc., abaixo.</small
+    >
+  </div>
+
+  <button type="submit" class="full-width" style="margin-top: 25px">
+    Processar e Baixar Planilha Formatada (.xlsx)
+  </button>
+</form>
+{% endblock %}

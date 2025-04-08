@@ -1,0 +1,21 @@
+{% extends "base.html" %} {% block title %}Bem-vindo{% endblock %} {% block
+content %}
+<div style="text-align: center; padding: 40px 0">
+  <img
+    src="{{ url_for('static', filename='images/vca.png') }}"
+    alt="Logo VCA"
+    style="max-width: 300px; margin-bottom: 30px"
+  />
+  <h1>Bem-vindo às Ferramentas Automatizadas</h1>
+  <p style="font-size: 1.1em; color: #777">
+    Utilize o menu acima para selecionar a ferramenta desejada.
+  </p>
+  <p style="margin-top: 40px; color: #777">
+    Desenvolvido para otimizar processos internos.
+  </p>
+
+  <p style="margin-top: 40px; color: #777">
+    Developed By: Grupo do Sistema - VCA Construtora<br />
+  </p>
+</div>
+{% endblock %}
