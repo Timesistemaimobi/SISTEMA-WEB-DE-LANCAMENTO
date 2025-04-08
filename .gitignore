@@ -4,11 +4,14 @@ venv/
 
 # Arquivos compilados Python
 __pycache__/
+*.pyc
+uploads/
 *.py[cod]
 *$py.class
 
 # Arquivos de configuração local/segredos
 .env
+.db
 config.py
 instance/
 *.pem
@@ -26,3 +29,4 @@ Thumbs.db
 .vscode/
 *.sublime-project
 *.sublime-workspace
+.swp
