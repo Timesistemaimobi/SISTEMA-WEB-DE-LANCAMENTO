@@ -1,0 +1,152 @@
+{# templates/formatador_tabela_precos.html #} {% extends 'base.html' %} {#
+Certifique-se que 'base.html' é o nome correto do seu layout base #} {% block
+title %}Formatação Tabela de Preços - EM CONSTRUÇÃO{% endblock %} {% block
+styles %} {# Adicione aqui CSS específico para esta página, se necessário (raro
+para formulários simples) #}
+<style>
+  /* Estilos opcionais específicos para esta página */
+  .description {
+    background-color: var(--flash-info-bg); /* Reutiliza cor de info */
+    color: var(--flash-info-text);
+    border: 1px solid var(--flash-info-border);
+    padding: 15px;
+    border-radius: 6px;
+    margin-bottom: 25px;
+    font-size: 0.95em;
+    line-height: 1.5;
+  }
+  .form-container {
+    max-width: 600px; /* Limita a largura do formulário */
+    margin: 0 auto; /* Centraliza o formulário */
+    padding: 20px;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    background-color: var(
+      --container-bg
+    ); /* Usa fundo do container ou um pouco diferente */
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+  }
+
+  /* Melhorar aparência do input file (complementa o styles.css geral) */
+  input[type="file"] {
+    border: 1px dashed var(--input-border);
+    padding: 15px;
+    text-align: center;
+    cursor: pointer;
+  }
+  input[type="file"]:hover {
+    border-color: var(--primary-color);
+    background-color: var(--table-row-hover-bg); /* Fundo sutil no hover */
+  }
+</style>
+{% endblock %} {% block content %}
+<h1>Formatação - Tabela de Preços</h1>
+
+<div class="description">
+  <p>
+    <strong>Instruções:</strong> Faça o upload da planilha de tabela de preços
+    original (formato similar ao exemplo "Dona Olivia Ciacci"). A ferramenta irá
+    processar os dados, reestruturar a planilha, aplicar formatações (valores,
+    áreas, moeda) e estilos visuais (cores, fontes, bordas) para gerar um novo
+    arquivo Excel (.xlsx) no layout padronizado, pronto para uso.
+  </p>
+  <p>
+    Certifique-se que a planilha de entrada contém as colunas essenciais:
+    <code>BLOCO</code>, <code>PAVIMENTO</code>, <code>APT</code>,
+    <code>TIPOLOGIA</code>, <code>ÁREA CONSTRUÍDA</code>, <code>QUINTAL</code>,
+    <code>VALOR DO IMÓVEL</code>.
+  </p>
+</div>
+
+<div class="form-container">
+  <form
+    method="post"
+    enctype="multipart/form-data"
+    action="{{ url_for('formatador_tabela_precos_tool') }}"
+  >
+    {# O CSRF token é geralmente tratado pelo Flask-WTF, se você usar
+    formularios WTForms. Se não usar, não é estritamente necessário para um
+    simples upload, mas considere medidas de segurança se a aplicação for
+    exposta. #} {{ form.csrf_token if form and form.csrf_token }} {# Exemplo se
+    usar WTForms #}
+
+    <div class="form-group">
+      <label for="arquivo_entrada"
+        ><strong>Selecione a Planilha de Preços (.xlsx, .xls):</strong></label
+      >
+      {# 'form-control' é uma classe comum em frameworks como Bootstrap, mas os
+      estilos base em styles.css devem funcionar. Adicione se necessário. #}
+      <input
+        type="file"
+        id="arquivo_entrada"
+        name="arquivo_entrada"
+        accept=".xlsx, .xls"
+        required
+      />
+    </div>
+
+    {# --- Seção para Parâmetros Adicionais (Opcional) --- Se você precisar de
+    configurações extras do usuário, adicione-as aqui. Exemplo:
+    <div class="form-group">
+      <label for="nome_empreendimento"
+        >Nome do Empreendimento (para cabeçalho):</label
+      >
+      <input
+        type="text"
+        id="nome_empreendimento"
+        name="nome_empreendimento"
+        placeholder="Ex: Dona Olivia Ciacci Residencial"
+      />
+    </div>
+    <div class="form-group">
+      <label for="numero_etapa">Número da Etapa (para cabeçalho):</label>
+      <input
+        type="number"
+        id="numero_etapa"
+        name="numero_etapa"
+        value="1"
+        min="1"
+      />
+    </div>
+    Lembre-se de ler esses valores em app.py (request.form.get(...)) e passá-los
+    para a função de processamento, se necessário. --- Fim da Seção Opcional ---
+    #}
+
+    <div style="text-align: center; margin-top: 30px">
+      <button type="submit" class="button-link">
+        {/* Usa a classe do seu CSS */}
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          width="18"
+          height="18"
+          fill="currentColor"
+          class="bi bi-file-earmark-arrow-down-fill"
+          viewBox="0 0 16 16"
+          style="vertical-align: middle; margin-right: 8px"
+        >
+          <path
+            d="M9.293 0H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V4.707A1 1 0 0 0 13.707 4L10 .293A1 1 0 0 0 9.293 0M9.5 3.5v-2l3 3h-2a1 1 0 0 1-1-1m-1 4v3.793l1.146-1.147a.5.5 0 0 1 .708.708l-2 2a.5.5 0 0 1-.708 0l-2-2a.5.5 0 0 1 .708-.708L7.5 11.293V7.5a.5.5 0 0 1 1 0"
+          />
+        </svg>
+        Processar e Baixar Planilha Formatada
+      </button>
+    </div>
+  </form>
+</div>
+
+{% endblock %} {% block scripts %} {# Adicione aqui JS específico, se necessário
+(ex: mostrar nome do arquivo selecionado) #}
+<script>
+  document.addEventListener("DOMContentLoaded", function () {
+    const fileInput = document.getElementById("arquivo_entrada");
+    if (fileInput) {
+      fileInput.addEventListener("change", function () {
+        if (this.files && this.files.length > 0) {
+          console.log("Arquivo selecionado:", this.files[0].name);
+          // Poderia exibir o nome do arquivo em algum lugar na interface, se desejado
+        }
+      });
+    }
+  });
+</script>
+{% endblock %}

@@ -12,6 +12,7 @@ from flask import (
     send_file, flash, session, abort
 )
 from werkzeug.utils import secure_filename
+from formatadores.tabela_precos_formatador import processar_tabela_precos_web
 
 # --- Constantes ---
 TIPOLOGIAS_PADRAO = {
@@ -775,6 +776,80 @@ def formatador_lote_tool():
 
     else: # GET
         return render_template('formatador_lote.html', active_page='formatador_lote')
+    
+# === ROTA PARA FORMATADOR TABELA DE PREÇOS ===
+@app.route('/formatador-tabela-precos', methods=['GET', 'POST'])
+def formatador_tabela_precos_tool():
+    tool_prefix = 'tab_precos_' # Prefixo para nome de arquivo temporário
+    temp_filepath = None
+    output_stream = None
+
+    if request.method == 'POST':
+        # Validação do upload
+        if 'arquivo_entrada' not in request.files:
+            flash('Nenhum arquivo selecionado!', 'error')
+            return redirect(url_for('formatador_tabela_precos_tool'))
+        file = request.files['arquivo_entrada']
+        if file.filename == '':
+            flash('Nenhum arquivo selecionado!', 'error')
+            return redirect(url_for('formatador_tabela_precos_tool'))
+        if not file or not allowed_file(file.filename): # Reutiliza a função global
+            flash('Tipo de arquivo inválido. Use .xlsx ou .xls.', 'error')
+            return redirect(url_for('formatador_tabela_precos_tool'))
+
+        # Gera nome seguro e caminho temporário
+        filename = secure_filename(f"{tool_prefix}{file.filename}")
+        temp_filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+
+        try:
+            # Salva o arquivo temporariamente
+            file.save(temp_filepath)
+            print(f"(Tabela Preços Rota) Arquivo temporário salvo: {temp_filepath}")
+
+            # Chama a função de processamento específica IMPORTADA
+            output_stream = processar_tabela_precos_web(temp_filepath) # <<< CHAMA A FUNÇÃO IMPORTADA
+
+            # Define o nome do arquivo de saída
+            input_basename = file.filename.rsplit('.', 1)[0]
+            output_filename = f"{input_basename}_PRECOS_FORMATADO.xlsx"
+            print(f"(Tabela Preços Rota) Enviando arquivo processado: {output_filename}")
+
+            # Envia o arquivo processado para download
+            return send_file(
+                output_stream,
+                mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                as_attachment=True,
+                download_name=output_filename
+            )
+        # Captura exceções específicas e genéricas do processamento
+        except ValueError as ve: # Erros esperados/validações da função de processamento
+            flash(f"Erro ao processar: {ve}", 'error')
+            print(f"(Tabela Preços Rota) Erro de validação/processamento: {ve}")
+            # Não precisa de traceback completo para erros de validação
+        except Exception as e: # Erros inesperados (leitura de arquivo, etc.)
+            flash(f"Erro inesperado ao processar Tabela de Preços: {e}", 'error')
+            print(f"(Tabela Preços Rota) Erro inesperado na rota: {e}")
+            traceback.print_exc() # Log detalhado para erros inesperados
+
+        # Bloco finally para limpeza é importante, mas a execução chega aqui APENAS se houve erro
+        # A limpeza no 'finally' original que tínhamos era melhor pois executava sempre
+        # Vamos reintroduzir o finally para garantir a limpeza mesmo em caso de erro antes do send_file
+
+        # Tenta limpar em caso de erro antes de redirecionar
+        if temp_filepath and os.path.exists(temp_filepath):
+            try: os.remove(temp_filepath)
+            except OSError: pass
+        if output_stream:
+            try: output_stream.close()
+            except: pass
+        return redirect(url_for('formatador_tabela_precos_tool'))
+
+    else: # Método GET
+        # Renderiza o template do formulário
+        return render_template(
+            'formatador_tabela_precos.html',
+            active_page='formatador_tabela_precos' # Para destacar o menu correto
+        )
 
 # --- Roda a aplicação ---
 if __name__ == "__main__":
