@@ -1,118 +1,147 @@
-<!DOCTYPE html>
-<html lang="pt-br">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>{% block title %}Ferramentas VCA{% endblock %} - VCA Construtora</title>
-    <link
-      rel="stylesheet"
-      href="{{ url_for('static', filename='styles.css') }}"
-    />
-    {# Bloco para adicionar CSS específico da página, se necessário #}
-    {% block styles %}{% endblock %}
-  </head>
-  <body>
-    <nav class="navbar">
-      {# Container para alinhar logo e toggler no mobile #}
-      <div class="navbar-container">
-          <div class="logo-container">
-              {# Link da logo para a página inicial #}
-              <a href="{{ url_for('home') }}">
-                  <img src="{{ url_for('static', filename='images/vca.png') }}" alt="Logo VCA">
-              </a>
-          </li>
-          <!-- Link 1: Importação CV -->
-          <li><a href="{{ url_for('importacao_cv_index') }}" {% if active_page == 'importacao_cv' %}class="active"{% endif %}>Importação CV Incorporação </a></li>
-          <!-- Link 2: Importação CV Lote -->
-          <li><a href="{{ url_for('importacao_cv_lote_tool') }}" {% if active_page == 'importacao_cv_lote' %}class="active"{% endif %}>Importação CV Lote</a></li>
-          <!-- Link 3: Importação SIENGE -->
-          <li><a href="{{ url_for('importacao_sienge_index') }}" {% if active_page == 'importacao_sienge' %}class="active"{% endif %}>Importação SIENGE Incorporação</a></li>
-          <!-- Link 4: Importação SIENGE Lote -->
-          <li><a href="{{ url_for('importacao_sienge_lote_index') }}" {% if active_page == 'importacao_sienge_lote' %}class="active"{% endif %}>Importação SIENGE Lote</a></li>
-          <!-- Link 5: Formatador Incorporação -->
-          <li><a href="{{ url_for('formatador_incorporacao_tool') }}" {% if active_page == 'formatador_incorporacao' %}class="active"{% endif %}>Formatador Incorporação</a></li>
-          <!-- Link 6: Formatador Lote -->
-          <li><a href="{{ url_for('formatador_lote_tool') }}" {% if active_page == 'formatador_lote' %}class="active"{% endif %}>Formatador Lote</a></li>
-      </ul>
-    </nav>
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
-    {# Container principal que receberá o conteúdo das páginas filhas #}
-    <main class="container">
-      <!-- Seção para Mensagens Flash (erros, avisos, sucesso) -->
-      {% with messages = get_flashed_messages(with_categories=true) %}
-        {% if messages %}
-        <ul class="flash-messages">
-          {% for category, message in messages %}
-          {# Usa a categoria passada ou 'info' como padrão #}
-          <li class="{{ category | default('info') }}">{{ message }}</li>
-          {% endfor %}
+  <title>{% block title %}Ferramentas VCA{% endblock %} - VCA Construtora</title>
+  <link
+    rel="stylesheet"
+    href="{{ url_for('static', filename='styles.css') }}"
+  />
+  {# Bloco para adicionar CSS específico da página, se necessário #}
+  {% block styles %}{% endblock %}
+
+</head>
+<body>
+  <nav class="navbar">
+    <div class="navbar-container">
+        <div class="logo-container">
+            {# Link da logo para a página inicial #}
+            <a href="{{ url_for('home') }}">
+                <img src="{{ url_for('static', filename='images/vca.png') }}" alt="Logo VCA">
+            </a>
+        </div>
+        {# Botão Hambúrguer (visível só em mobile via CSS) #}
+        <button class="navbar-toggler" type="button" aria-label="Toggle navigation">
+            <span class="toggler-icon">☰</span>
+        </button>
+    </div>
+
+    {# Container do menu que será mostrado/escondido no mobile #}
+    <div class="navbar-collapse">
+        <ul>
+            <!-- Menu Dropdown: Importação -->
+            <li class="dropdown">
+                {# Link principal do menu (href="#" para não navegar) #}
+                {# Adiciona 'active' se QUALQUER página de importação estiver ativa #}
+                <a href="#" {% if active_page and active_page.startswith('importacao_') %}class="active"{% endif %}>
+                    Importação <span class="dropdown-indicator"></span> {# Indicador CSS #}
+                </a>
+                <ul class="dropdown-menu">
+                    {# Os links internos levam às páginas #}
+                    <li><a href="{{ url_for('importacao_cv_index') }}">Importação CV</a></li>
+                    <li><a href="{{ url_for('importacao_cv_lote_tool') }}">Importação CV Lote</a></li>
+                    <li><a href="{{ url_for('importacao_sienge_index') }}">Importação SIENGE</a></li>
+                    <li><a href="{{ url_for('importacao_sienge_lote_index') }}">Importação SIENGE Lote</a></li>
+                </ul>
+            </li>
+
+            <!-- Menu Dropdown: Formatação -->
+            <li class="dropdown">
+                {# Link principal do menu #}
+                {# Adiciona 'active' se QUALQUER página de formatação estiver ativa #}
+                <a href="#" {% if active_page and active_page.startswith('formatador_') %}class="active"{% endif %}>
+                    Formatação <span class="dropdown-indicator"></span> {# Indicador CSS #}
+                </a>
+                <ul class="dropdown-menu">
+                    <li><a href="{{ url_for('formatador_incorporacao_tool') }}">Formatador Incorporação</a></li>
+                    <li><a href="{{ url_for('formatador_lote_tool') }}">Formatador Lote</a></li>
+                    {# Adicione aqui o link para o Formatador de Preços quando criado #}
+                    {# <li><a href="{{ url_for('formatador_preco_tool') }}">Formatador Tabela Preços</a></li> #}
+                </ul>
+            </li>
+
         </ul>
-        {% endif %}
-      {% endwith %}
+    </div>
+  </nav>
 
-      <!-- Bloco onde o conteúdo específico de cada página será inserido -->
-      {% block content %}
-        {# Conteúdo padrão se o bloco não for sobrescrito (opcional) #}
-        <p>Bem-vindo! Selecione uma ferramenta no menu.</p>
-      {% endblock %}
-    </main>
+  {# Container principal que receberá o conteúdo das páginas filhas #}
+  <main class="container">
 
-    <!-- Bloco para adicionar JavaScript específico da página no final do body -->
-    {% block scripts %}
-    <script>
-        // Script para menu hambúrguer e dropdown mobile
-        document.addEventListener('DOMContentLoaded', function() {
-            const toggler = document.querySelector('.navbar-toggler');
-            const collapse = document.querySelector('.navbar-collapse');
-            const dropdownToggles = document.querySelectorAll('.navbar li.dropdown > a');
+    <!-- Seção para Mensagens Flash (erros, avisos, sucesso) -->
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+      <ul class="flash-messages">
+        {% for category, message in messages %}
+        {# Usa a categoria passada ou 'info' como padrão #}
+        <li class="{{ category | default('info') }}">{{ message }}</li>
+        {% endfor %}
+      </ul>
+      {% endif %}
+    {% endwith %}
 
-            // Toggle do menu principal (hambúrguer)
-            if (toggler && collapse) {
-                toggler.addEventListener('click', function() {
-                    // Fecha todos os submenus ao abrir/fechar o principal
-                    document.querySelectorAll('.navbar li.dropdown.open').forEach(li => li.classList.remove('open'));
-                    collapse.classList.toggle('show'); // Abre/fecha menu principal
-                });
-            }
-
-            // Toggle dos submenus (dropdowns) no mobile
-            dropdownToggles.forEach(function(toggle) {
-                toggle.addEventListener('click', function(event) {
-                    if (toggle.getAttribute('href') === '#') {
-                        event.preventDefault(); // Previne scroll para o topo
-                    }
-
-                    // Verifica se estamos em visualização mobile (pela presença do toggler visível)
-                    const isMobile = window.getComputedStyle(toggler).display !== 'none';
-
-                    if (isMobile) {
-                        const parentLi = toggle.closest('li.dropdown');
-                        if (parentLi) {
-                            // Fecha outros dropdowns abertos antes de abrir o novo
-                            if (!parentLi.classList.contains('open')) {
-                                document.querySelectorAll('.navbar li.dropdown.open').forEach(li => li.classList.remove('open'));
-                            }
-                            parentLi.classList.toggle('open'); // Abre/fecha o clicado
-                        }
-                    }
-                    // Em telas maiores, o hover CSS cuida disso
-                });
-            });
-
-             // Opcional: Fechar menu principal ao clicar fora
-             document.addEventListener('click', function(event) {
-                 const isClickInsideNavbar = event.target.closest('.navbar');
-                 const isToggler = event.target.closest('.navbar-toggler');
-
-                 // Se o menu está aberto E o clique NÃO foi dentro da navbar E NÃO foi no botão toggler
-                 if (collapse && collapse.classList.contains('show') && !isClickInsideNavbar && !isToggler) {
-                     collapse.classList.remove('show');
-                     // Fecha também todos os submenus abertos
-                     document.querySelectorAll('.navbar li.dropdown.open').forEach(li => li.classList.remove('open'));
-                 }
-             });
-        });
-    </script>
+    <!-- Bloco onde o conteúdo específico de cada página será inserido -->
+    {% block content %}
+      {# Conteúdo padrão se o bloco não for sobrescrito (opcional) #}
+      <p>Bem-vindo! Selecione uma ferramenta no menu.</p>
     {% endblock %}
-  </body>
+  </main>
+
+  <!-- Bloco para adicionar JavaScript específico da página no final do body -->
+  {% block scripts %}
+  <script>
+      // Script para menu hambúrguer e dropdown mobile
+      document.addEventListener('DOMContentLoaded', function() {
+          const toggler = document.querySelector('.navbar-toggler');
+          const collapse = document.querySelector('.navbar-collapse');
+          const dropdownToggles = document.querySelectorAll('.navbar li.dropdown > a');
+
+          // Toggle do menu principal (hambúrguer)
+          if (toggler && collapse) {
+              toggler.addEventListener('click', function() {
+                  // Fecha todos os submenus ao abrir/fechar o principal
+                  document.querySelectorAll('.navbar li.dropdown.open').forEach(li => li.classList.remove('open'));
+                  collapse.classList.toggle('show'); // Abre/fecha menu principal
+              });
+          }
+
+          // Toggle dos submenus (dropdowns) no mobile
+          dropdownToggles.forEach(function(toggle) {
+              toggle.addEventListener('click', function(event) {
+                  if (toggle.getAttribute('href') === '#') {
+                      event.preventDefault(); // Previne scroll para o topo
+                  }
+
+                  // Verifica se estamos em visualização mobile (pela presença do toggler visível)
+                  const isMobile = window.getComputedStyle(toggler).display !== 'none';
+
+                  if (isMobile) {
+                      const parentLi = toggle.closest('li.dropdown');
+                      if (parentLi) {
+                          // Fecha outros dropdowns abertos antes de abrir o novo
+                          if (!parentLi.classList.contains('open')) {
+                              document.querySelectorAll('.navbar li.dropdown.open').forEach(li => li.classList.remove('open'));
+                          }
+                          parentLi.classList.toggle('open'); // Abre/fecha o clicado
+                      }
+                  }
+                  // Em telas maiores, o hover CSS cuida disso
+              });
+          });
+
+           // Opcional: Fechar menu principal ao clicar fora
+           document.addEventListener('click', function(event) {
+               const isClickInsideNavbar = event.target.closest('.navbar');
+               const isToggler = event.target.closest('.navbar-toggler');
+
+               // Se o menu está aberto E o clique NÃO foi dentro da navbar E NÃO foi no botão toggler
+               if (collapse && collapse.classList.contains('show') && !isClickInsideNavbar && !isToggler) {
+                   collapse.classList.remove('show');
+                   // Fecha também todos os submenus abertos
+                   document.querySelectorAll('.navbar li.dropdown.open').forEach(li => li.classList.remove('open'));
+               }
+           });
+      });
+  </script>
+  {% endblock %}
+</body>
 </html>
