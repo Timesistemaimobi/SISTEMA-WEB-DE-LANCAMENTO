@@ -1,26 +1,25 @@
-/* static/styles.css */
+/* static/styles.css - Correção Layout Navbar Desktop e Fundo Dropdown */
 
-/* 1. Definir Variáveis de Cor (CSS Custom Properties) - COM SUAS MUDANÇAS */
+/* 1. Definir Variáveis de Cor (CSS Custom Properties) */
 :root {
-  /* Modo Claro (Padrão) - Com suas cores */
+  /* Modo Claro (Padrão) */
   --bg-color: #f4f7f6;
-  --text-color: #333333; /* << VOLTADO para #333 para legibilidade, ajuste se PRECISAR ser verde */
+  --text-color: #333333;
   --container-bg: #ffffff;
   --container-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
   --border-color: #e0e0e0;
   --border-color-strong: #cccccc;
-  --primary-color: #68c900; /* Verde VCA */
-  /* Ligeiramente escurecido para hover, senão não há efeito visual */
-  --primary-hover-color: #5aae02; /* << AJUSTADO para hover */
-  --secondary-color: #2a3f54; /* << Mantido Azul Escuro para títulos e navbar (melhor contraste) */
-  --accent-color: #73879c; /* << Mantido Cinza Azulado para botões secundários/upload */
-  --accent-hover-color: #5a6f84; /* << Mantido hover do accent */
+  --primary-color: #68c900;
+  --primary-hover-color: #5aae02;
+  --secondary-color: #2a3f54; /* Azul para navbar/títulos */
+  --accent-color: #73879c;
+  --accent-hover-color: #5a6f84;
   --link-color: var(--primary-color);
   --link-hover-color: var(--primary-hover-color);
-  --navbar-bg: var(--secondary-color); /* Azul escuro */
+  --navbar-bg: var(--secondary-color);
   --navbar-link-color: #e7e7e7;
-  --navbar-link-hover-bg: var(--primary-color); /* Fundo verde no hover */
-  --navbar-link-hover-color: #ffffff; /* Texto branco no hover */
+  --navbar-link-hover-bg: var(--primary-color);
+  --navbar-link-hover-color: #ffffff;
   --table-header-bg: #f8f9fa;
   --table-header-color: #444444;
   --table-row-odd-bg: #fdfdfd;
@@ -28,7 +27,7 @@
   --input-bg: #ffffff;
   --input-border: var(--border-color-strong);
   --input-focus-border: var(--primary-color);
-  --input-focus-shadow: rgba(104, 201, 0, 0.3); /* Sombra verde no focus */
+  --input-focus-shadow: rgba(104, 201, 0, 0.3);
   --input-placeholder-color: #aaa;
   --button-text-color: #ffffff;
   --flash-error-bg: #f8d7da;
@@ -45,43 +44,28 @@
   --flash-success-border: #c3e6cb;
 }
 
-/* 2. Definir Variáveis para Modo Escuro - Com seus ajustes */
+/* 2. Definir Variáveis para Modo Escuro */
 @media (prefers-color-scheme: dark) {
   :root {
     --bg-color: #1a1d21;
-    --text-color: #d1d5db; /* Cinza claro para texto */
+    --text-color: #d1d5db;
     --container-bg: #252a30;
     --container-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
     --border-color: #4b5563;
     --border-color-strong: #6b7280;
-    /* Mantendo primário e secundário (títulos) definidos no :root claro para consistência */
-    /* --primary-color: #68c900;  (já definido) */
-    /* --primary-hover-color: #5aae02; (já definido) */
-    /* --secondary-color: #68c900; (usando o verde) << AJUSTADO ABAIXO */
-    --secondary-color: #86d92b; /* Verde um pouco mais claro para títulos no escuro */
+    --secondary-color: #86d92b; /* Verde mais claro para títulos */
     --accent-color: #6b7280;
     --accent-hover-color: #9ca3af;
-    --link-color: var(--primary-color);
-    --link-hover-color: var(--primary-hover-color);
-    --navbar-bg: #1f2428; /* Navbar bem escura */
+    --navbar-bg: #1f2428;
     --navbar-link-color: #a0aec0;
-    --navbar-link-hover-bg: var(--primary-color);
-    --navbar-link-hover-color: #ffffff;
     --table-header-bg: #374151;
     --table-header-color: #e5e7eb;
     --table-row-odd-bg: #20252b;
     --table-row-hover-bg: #313840;
     --input-bg: #374151;
     --input-border: var(--border-color);
-    --input-focus-border: var(--primary-color);
-    --input-focus-shadow: rgba(
-      104,
-      201,
-      0,
-      0.4
-    ); /* Sombra verde mais visível */
+    --input-focus-shadow: rgba(104, 201, 0, 0.4);
     --input-placeholder-color: #9ca3af;
-    /* Flash messages escuras */
     --flash-error-bg: #58151c;
     --flash-error-text: #f8d7da;
     --flash-error-border: #a04f5b;
@@ -95,11 +79,9 @@
     --flash-success-text: #d4edda;
     --flash-success-border: #4a8c5a;
   }
-
-  /* Ajustes específicos modo escuro */
   input[type="file"]::file-selector-button {
     background-color: var(--accent-color);
-    color: var(--button-text-color); /* Garante texto branco */
+    color: var(--button-text-color);
     border: 1px solid var(--border-color-strong);
   }
   input[type="file"]::file-selector-button:hover {
@@ -107,11 +89,11 @@
   }
 }
 
-/* 3. Animação de Entrada (Fade-in + Slide-up suave) */
+/* 3. Animação de Entrada */
 @keyframes fadeInSlideUp {
   from {
     opacity: 0;
-    transform: translateY(15px); /* Começa ligeiramente abaixo */
+    transform: translateY(15px);
   }
   to {
     opacity: 1;
@@ -119,102 +101,245 @@
   }
 }
 
-/* 4. Estilos Gerais e Aplicação de Variáveis e Transições */
-
+/* 4. Estilos Gerais */
 body {
   font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
     Oxygen, Ubuntu, Cantarell, "Open Sans", "Helvetica Neue", sans-serif;
   margin: 0;
-  padding-top: 75px; /* Aumenta espaço para navbar + sombra */
+  padding-top: 75px;
   background-color: var(--bg-color);
   color: var(--text-color);
   line-height: 1.6;
-  /* Transição suave para modo claro/escuro */
   transition: background-color 0.3s ease-in-out, color 0.3s ease-in-out;
 }
-
 *,
 *::before,
 *::after {
   box-sizing: border-box;
 }
 
-/* Menu de Navegação com Transições */
+/* 5. Menu de Navegação (Navbar) */
 nav.navbar {
   background-color: var(--navbar-bg);
-  padding: 0 25px;
+  padding: 0 15px;
   position: fixed;
   top: 0;
   left: 0;
   width: 100%;
   z-index: 1000;
-  box-shadow: 0 3px 6px rgba(0, 0, 0, 0.15); /* Sombra um pouco mais pronunciada */
+  box-shadow: 0 3px 6px rgba(0, 0, 0, 0.15);
   height: 60px;
-  transition: background-color 0.3s ease-in-out;
+  display: flex; /* Mantém flex */
+  align-items: center; /* Alinha verticalmente */
 }
-nav.navbar ul {
-  list-style: none;
-  margin: 0;
-  padding: 0;
+
+/* Logo Container */
+nav.navbar .logo-container {
+  margin-right: 20px;
+  flex-shrink: 0;
   display: flex;
   align-items: center;
-  height: 100%;
-  overflow-x: auto;
-  white-space: nowrap;
 }
 nav.navbar .logo-container img {
   max-height: 38px;
-  margin-right: 25px;
-  vertical-align: middle;
-  transition: transform 0.2s ease-in-out;
+  display: block;
 }
 nav.navbar .logo-container img:hover {
   transform: scale(1.05);
-} /* Efeito sutil na logo */
-nav.navbar li {
-  margin-right: 15px;
-}
-nav.navbar li:last-child {
-  margin-right: 0;
-}
-nav.navbar a {
-  color: var(--navbar-link-color);
-  text-decoration: none;
-  padding: 8px 14px; /* Aumenta um pouco o padding */
-  border-radius: 5px; /* Bordas mais arredondadas */
-  /* Transição aplicada a múltiplas propriedades */
-  transition: background-color 0.2s ease-in-out, color 0.2s ease-in-out,
-    transform 0.15s ease-in-out, box-shadow 0.2s ease-in-out;
-  display: inline-block;
-  font-size: 0.9em;
-  position: relative; /* Necessário para pseudo-elementos se usados */
-  will-change: transform; /* Otimização para transform */
-}
-nav.navbar a:hover,
-nav.navbar a.active {
-  background-color: var(--navbar-link-hover-bg);
-  color: var(--navbar-link-hover-color);
-  transform: translateY(-2px); /* Levanta um pouco no hover/active */
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1); /* Sombra sutil no item ativo/hover */
+  transition: transform 0.2s ease-in-out;
 }
 
-/* Container Principal com Animação */
+/* Toggler (Mobile) */
+.navbar-toggler {
+  display: none;
+  margin-left: auto;
+  background: none;
+  border: none;
+  color: var(--navbar-link-color);
+  font-size: 1.8rem;
+  cursor: pointer;
+  padding: 5px 10px;
+}
+
+/* UL Principal do Menu (Container dos LIs: Importação, Formatação) */
+/* <<< FOCO AQUI >>> */
+nav.navbar ul#main-menu-list, /* Se usar ID */
+nav.navbar .navbar-collapse > ul /* Se usar a classe .navbar-collapse como wrapper */ {
+  list-style: none !important; /* FORÇA remoção de bullets */
+  margin: 0;
+  padding: 0 !important; /* FORÇA sem padding */
+  display: flex !important; /* FORÇA flex */
+  flex-direction: row !important; /* FORÇA direção horizontal */
+  align-items: center; /* Alinha LIs verticalmente */
+  height: 100%; /* Ocupa altura da navbar */
+  width: auto; /* Largura baseada no conteúdo */
+  position: static;
+  overflow: visible;
+}
+
+/* Item de Lista Principal (LI) */
+nav.navbar li {
+  position: relative;
+  margin: 0; /* SEM MARGEM */
+  list-style-type: none !important; /* Garante sem bullets no LI */
+  padding: 0 !important; /* Garante sem padding no LI */
+  /* REMOVIDO display: list-item; */
+}
+/* Link Principal (A) */
+nav.navbar li > a {
+  color: var(--navbar-link-color);
+  text-decoration: none;
+  padding: 10px 15px; /* Espaçamento VISUAL */
+  border-radius: 5px;
+  transition: background-color 0.2s ease-in-out, color 0.2s ease-in-out;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 100%;
+  box-sizing: border-box;
+  position: relative;
+  font-size: 0.9em;
+  white-space: nowrap;
+}
+/* Hover/Active links NÃO dropdown */
+nav.navbar li:not(.dropdown) > a:hover,
+nav.navbar li:not(.dropdown) > a.active {
+  background-color: var(--navbar-link-hover-bg);
+  color: var(--navbar-link-hover-color);
+}
+/* Hover/Active links principais dropdown */
+nav.navbar li.dropdown > a:hover,
+nav.navbar li.dropdown > a.active {
+  background-color: var(--navbar-link-hover-bg);
+  color: var(--navbar-link-hover-color);
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
+  transform: none;
+  box-shadow: none;
+}
+/* Indicador Dropdown */
+.dropdown-indicator {
+  display: inline-block;
+  width: 0;
+  height: 0;
+  margin-left: 5px;
+  vertical-align: middle;
+  border-left: 4px solid transparent;
+  border-right: 4px solid transparent;
+  border-top: 5px solid currentColor;
+  transition: transform 0.2s ease-in-out;
+  opacity: 0.8;
+}
+
+/* 6. Dropdown Menu (UL aninhado) */
+nav.navbar li.dropdown ul.dropdown-menu {
+  display: none;
+  position: absolute;
+  top: 100%;
+  left: 0;
+  z-index: 1001;
+  min-width: 100%;
+  width: auto;
+  padding: 0; /* SEM Padding na UL */
+  margin: 0;
+  list-style: none;
+  background-color: transparent; /* UL Transparente */
+  border: 1px solid var(--border-color);
+  border-top: none;
+  border-radius: 0 0 6px 6px;
+  box-shadow: 0 5px 10px rgba(0, 0, 0, 0.2);
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(5px);
+  transition: opacity 0.15s ease-in-out, visibility 0.15s ease-in-out,
+    transform 0.15s ease-in-out;
+  overflow: hidden; /* Corta cantos */
+}
+nav.navbar li.dropdown:hover > ul.dropdown-menu {
+  display: block;
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0);
+}
+
+/* Item LI dentro do dropdown */
+nav.navbar ul.dropdown-menu li {
+  margin: 0; /* SEM Margem */
+  width: 100%;
+  display: block;
+  background-color: var(--navbar-bg); /* FUNDO NO LI */
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  list-style-type: none !important; /* Garante sem bullets */
+  padding: 0 !important; /* Garante sem padding */
+}
+/* Link A dentro do dropdown */
+nav.navbar ul.dropdown-menu li a {
+  display: block;
+  padding: 10px 18px; /* Padding INTERNO */
+  color: var(--navbar-link-color);
+  white-space: nowrap;
+  font-size: 0.88em;
+  transition: background-color 0.15s ease-in-out, color 0.15s ease-in-out;
+  text-decoration: none;
+  border-radius: 0;
+  background-color: transparent;
+}
+/* Último item LI */
+nav.navbar ul.dropdown-menu li:last-child {
+  border-bottom: none;
+  border-bottom-left-radius: 5px;
+  border-bottom-right-radius: 5px;
+  overflow: hidden; /* Corta o link interno */
+}
+/* Hover/Focus nos links */
+nav.navbar ul.dropdown-menu li a:hover,
+nav.navbar ul.dropdown-menu li a:focus {
+  background-color: var(--primary-color);
+  color: var(--button-text-color);
+}
+
+/* Ajustes Modo Escuro Dropdown */
+@media (prefers-color-scheme: dark) {
+  nav.navbar li.dropdown ul.dropdown-menu {
+    background-color: transparent;
+    border-color: var(--border-color);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+  }
+  nav.navbar ul.dropdown-menu li {
+    background-color: var(--navbar-bg);
+    border-bottom-color: rgba(255, 255, 255, 0.1);
+  }
+  nav.navbar ul.dropdown-menu li:last-child {
+    border-bottom: none;
+  }
+  nav.navbar ul.dropdown-menu li a {
+    color: var(--navbar-link-color);
+  }
+  nav.navbar ul.dropdown-menu li a:hover,
+  nav.navbar ul.dropdown-menu li a:focus {
+    background-color: var(--primary-color);
+    color: var(--button-text-color);
+  }
+}
+
+/* --- RESTANTE DO CSS (Container, Títulos, Forms, Tabelas, Flash, Responsividade Mobile) --- */
+/* Cole aqui o restante do seu CSS a partir da seção 7 (sem alterações) */
+
+/* 7. Container Principal */
 main.container {
   background-color: var(--container-bg);
-  padding: 25px 35px; /* Aumenta padding lateral */
-  border-radius: 10px; /* Mais arredondado */
+  padding: 25px 35px;
+  border-radius: 10px;
   box-shadow: var(--container-shadow);
   max-width: 1100px;
-  margin: 30px auto; /* Mais margem */
+  margin: 30px auto;
   border: 1px solid var(--border-color);
-  /* Aplica a animação */
   animation: fadeInSlideUp 0.6s ease-out forwards;
-  /* Transição para modo escuro */
   transition: background-color 0.3s ease-in-out, border-color 0.3s ease-in-out,
     box-shadow 0.3s ease-in-out;
 }
 
-/* Títulos com Transição */
+/* 8. Títulos */
 h1,
 h2,
 h3 {
@@ -222,7 +347,7 @@ h3 {
   margin-top: 1.2em;
   margin-bottom: 0.7em;
   line-height: 1.3;
-  transition: color 0.3s ease-in-out; /* Transição de cor */
+  transition: color 0.3s ease-in-out;
 }
 h1 {
   text-align: center;
@@ -238,16 +363,38 @@ h3 {
   font-size: 1.25em;
 }
 
-/* Parágrafos */
+/* 9. Texto e Links */
 p {
   margin-bottom: 1.1em;
 }
 small {
   opacity: 0.8;
   font-size: 0.85em;
-} /* Estilo para small */
+}
+a {
+  color: var(--link-color);
+  text-decoration: none;
+  transition: color 0.2s ease-in-out, text-decoration 0.2s ease-in-out;
+}
+a:hover {
+  color: var(--link-hover-color);
+  text-decoration: underline;
+}
+.cancel-link {
+  display: inline-block;
+  text-align: center;
+  margin-top: 20px;
+  color: var(--text-color);
+  opacity: 0.85;
+  font-size: 0.9em;
+  transition: color 0.2s ease-in-out, opacity 0.2s ease-in-out;
+}
+.cancel-link:hover {
+  color: var(--link-hover-color);
+  opacity: 1;
+}
 
-/* Formulários com Transições */
+/* 10. Formulários */
 .form-group {
   margin-bottom: 20px;
 }
@@ -264,14 +411,13 @@ input[type="file"],
 input[list],
 select {
   width: 100%;
-  padding: 11px 14px; /* Aumenta padding */
+  padding: 11px 14px;
   border: 1px solid var(--input-border);
-  border-radius: 6px; /* Mais arredondado */
+  border-radius: 6px;
   box-sizing: border-box;
   font-size: 1em;
   background-color: var(--input-bg);
   color: var(--text-color);
-  /* Transição completa */
   transition: border-color 0.25s ease-in-out, box-shadow 0.25s ease-in-out,
     background-color 0.3s ease-in-out, color 0.3s ease-in-out;
 }
@@ -285,7 +431,7 @@ input[type="file"]:focus,
 input[list]:focus,
 select:focus {
   border-color: var(--input-focus-border);
-  box-shadow: 0 0 0 3px var(--input-focus-shadow); /* Sombra mais pronunciada */
+  box-shadow: 0 0 0 3px var(--input-focus-shadow);
   outline: none;
 }
 input[type="file"] {
@@ -299,11 +445,11 @@ input[type="file"]::file-selector-button {
   border: none;
   border-radius: 5px;
   cursor: pointer;
-  transition: background-color 0.2s ease-in-out, transform 0.15s ease-in-out; /* Adiciona transição */
+  transition: background-color 0.2s ease-in-out, transform 0.15s ease-in-out;
 }
 input[type="file"]::file-selector-button:hover {
   background-color: var(--accent-hover-color);
-  transform: scale(1.03); /* Efeito de leve aumento */
+  transform: scale(1.03);
 }
 input[type="checkbox"] {
   margin-right: 8px;
@@ -322,39 +468,38 @@ label.checkbox-label {
   transition: color 0.3s ease-in-out;
 }
 
-/* Botões com Transições e Efeitos */
+/* 11. Botões */
 button[type="submit"],
 input[type="submit"],
 .button-link {
   display: inline-block;
   background-color: var(--primary-color);
   color: var(--button-text-color);
-  padding: 12px 28px; /* Mais padding */
+  padding: 12px 28px;
   border: none;
   border-radius: 6px;
   cursor: pointer;
   font-size: 1.05em;
-  font-weight: 600; /* Mais negrito */
+  font-weight: 600;
   text-align: center;
   text-decoration: none;
-  /* Transição completa */
   transition: background-color 0.2s ease-in-out, transform 0.15s ease-in-out,
     box-shadow 0.2s ease-in-out;
   box-shadow: 0 2px 5px rgba(0, 0, 0, 0.15);
-  will-change: transform, box-shadow; /* Otimização */
+  will-change: transform, box-shadow;
 }
 button[type="submit"]:hover,
 input[type="submit"]:hover,
 .button-link:hover {
-  background-color: var(--primary-hover-color); /* Cor ligeiramente diferente */
-  box-shadow: 0 5px 10px rgba(0, 0, 0, 0.18); /* Sombra maior no hover */
-  transform: translateY(-3px); /* Levanta mais */
+  background-color: var(--primary-hover-color);
+  box-shadow: 0 5px 10px rgba(0, 0, 0, 0.18);
+  transform: translateY(-3px);
 }
 button[type="submit"]:active,
 input[type="submit"]:active,
 .button-link:active {
-  transform: translateY(-1px); /* Pressiona levemente */
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1); /* Sombra menor no clique */
+  transform: translateY(-1px);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
 }
 button[type="submit"].full-width,
 input[type="submit"].full-width {
@@ -362,7 +507,7 @@ input[type="submit"].full-width {
   width: 100%;
 }
 
-/* Tabelas com Transições */
+/* 12. Tabelas */
 table {
   width: 100%;
   border-collapse: collapse;
@@ -370,18 +515,18 @@ table {
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
   border: 1px solid var(--border-color);
   transition: border-color 0.3s ease-in-out;
-  overflow: hidden; /* Para border-radius funcionar com a tabela */
-  border-radius: 8px; /* Bordas arredondadas na tabela */
+  overflow: hidden;
+  border-radius: 8px;
 }
 th,
 td {
-  border-width: 0 0 1px 0; /* Apenas borda inferior */
+  border-width: 0 0 1px 0;
   border-style: solid;
   border-color: var(--border-color);
-  padding: 14px 18px; /* Mais padding */
+  padding: 14px 18px;
   text-align: left;
   vertical-align: middle;
-  transition: border-color 0.3s ease-in-out, background-color 0.2s ease-in-out; /* Transição no hover */
+  transition: border-color 0.3s ease-in-out, background-color 0.2s ease-in-out;
 }
 th {
   background-color: var(--table-header-bg);
@@ -398,12 +543,11 @@ tbody tr:nth-child(odd) {
 tbody tr:hover {
   background-color: var(--table-row-hover-bg);
 }
-/* Remove borda inferior da última linha */
 tbody tr:last-child td {
   border-bottom-width: 0;
 }
 
-/* Mensagens Flash com Transição (só se mudar dinamicamente) */
+/* 13. Mensagens Flash */
 .flash-messages {
   list-style: none;
   padding: 0;
@@ -442,41 +586,153 @@ tbody tr:last-child td {
   border-color: var(--flash-success-border);
 }
 
-/* Links com Transição */
-a {
-  color: var(--link-color);
-  text-decoration: none;
-  transition: color 0.2s ease-in-out, text-decoration 0.2s ease-in-out;
-}
-a:hover {
-  color: var(--link-hover-color);
-  text-decoration: underline;
-}
-.cancel-link {
-  display: inline-block;
-  text-align: center;
-  margin-top: 20px;
-  color: var(--text-color);
-  opacity: 0.85;
-  font-size: 0.9em;
-  transition: color 0.2s ease-in-out, opacity 0.2s ease-in-out;
-}
-.cancel-link:hover {
-  color: var(--link-hover-color);
-  opacity: 1;
-}
-
-/* Responsividade (mantida) */
 @media (max-width: 992px) {
+  nav.navbar {
+    height: auto;
+    min-height: 60px;
+    /* Precisa do container para space-between funcionar no mobile */
+    padding: 0; /* Padding vai para o .navbar-container */
+    display: block; /* Navbar deixa de ser flex */
+    position: relative; /* Para conter o .navbar-collapse absoluto */
+  }
+  .navbar-container {
+    /* Container da logo e toggle */
+    width: 100%;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    height: 60px;
+    padding: 0 15px; /* Padding dentro do container */
+    position: relative; /* Para z-index funcionar se necessário */
+    z-index: 1001; /* Garante que fique sobre o menu colapsado */
+    background-color: var(
+      --navbar-bg
+    ); /* Fundo para cobrir menu quando fechado */
+  }
+  /* Esconde o UL principal do desktop no mobile */
+  nav.navbar ul#main-menu-list,
+  nav.navbar .navbar-collapse > ul {
+    /* Seletor mais genérico */
+    display: none;
+  }
+  .navbar-toggler {
+    display: block;
+  } /* Mostra o botão */
+
+  /* Estilos para .navbar-collapse quando aberto no mobile */
+  /* Certifique-se que você tem <div class="navbar-collapse"> no base.html */
+  .navbar-collapse {
+    /* Estilos base (escondido) */
+    display: none;
+    width: 100%;
+    position: absolute;
+    top: 60px;
+    left: 0;
+    max-height: 0;
+    overflow-y: auto;
+    transition: max-height 0.3s ease-out, padding 0.3s ease-out,
+      background-color 0.3s ease-in-out;
+    padding: 0;
+    background-color: var(--navbar-bg);
+    box-shadow: 0 3px 6px rgba(0, 0, 0, 0.1);
+    z-index: 1000; /* Abaixo do container */
+
+    /* Estilos para UL e filhos QUANDO DENTRO do .navbar-collapse */
+    ul {
+      display: flex;
+      flex-direction: column;
+      align-items: stretch;
+      width: 100%;
+      padding: 0;
+      height: auto;
+    }
+    li {
+      margin-right: 0;
+      width: 100%;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    }
+    li:last-child {
+      border-bottom: none;
+    }
+    li a {
+      padding: 14px 20px;
+      width: 100%;
+      border-radius: 0;
+      box-shadow: none;
+      transform: none !important;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 6px;
+      height: auto;
+      font-size: 1em;
+    }
+    li a.active {
+      background-color: transparent;
+    }
+    li a:hover {
+      background-color: rgba(255, 255, 255, 0.1);
+      color: #fff;
+    }
+
+    /* Dropdown Mobile DENTRO do collapse */
+    li.dropdown ul.dropdown-menu {
+      position: static;
+      display: none;
+      width: 100%;
+      background-color: rgba(0, 0, 0, 0.15);
+      border: none;
+      box-shadow: none;
+      padding: 0;
+      margin: 0;
+      opacity: 1;
+      visibility: visible;
+      transform: none;
+      max-height: none;
+      transition: none;
+      border-top: none;
+      overflow: visible;
+    }
+    li.dropdown.open > ul.dropdown-menu {
+      display: block;
+    }
+    ul.dropdown-menu li {
+      border-bottom: none;
+      background-color: transparent;
+    }
+    ul.dropdown-menu li a {
+      padding: 12px 20px 12px 35px;
+      font-size: 0.9em;
+      color: var(--navbar-link-color);
+      justify-content: flex-start;
+      opacity: 0.9;
+    }
+    ul.dropdown-menu li a:hover,
+    ul.dropdown-menu li a:focus {
+      background-color: var(--primary-color);
+      color: var(--button-text-color);
+      opacity: 1;
+    }
+    li.dropdown > a {
+      cursor: pointer;
+    }
+    li.dropdown.open > a > .dropdown-indicator {
+      transform: rotate(180deg);
+    }
+  }
+  .navbar-collapse.show {
+    /* Classe para mostrar */
+    display: block; /* Volta a ser bloco */
+    max-height: calc(100vh - 60px);
+    padding: 0;
+  }
+
+  /* Outros ajustes mobile */
   main.container {
     max-width: 95%;
     padding: 20px;
+    margin: 20px auto;
   }
-  nav.navbar {
-    padding: 0 15px;
-  }
-}
-@media (max-width: 768px) {
   h1 {
     font-size: 1.6em;
   }
@@ -487,39 +743,48 @@ a:hover {
   td {
     padding: 10px 12px;
     font-size: 0.9em;
-  } /* Ajuste padding tabela */
+  }
   button[type="submit"],
   input[type="submit"],
   .button-link {
     font-size: 1em;
     padding: 10px 20px;
   }
-  nav.navbar ul {
-    justify-content: flex-start;
-  }
 }
+
 @media (max-width: 576px) {
+  /* Ajustes para telas muito pequenas */
   body {
     padding-top: 60px;
-  } /* Ajuste padding */
+  }
   nav.navbar {
+    min-height: 55px;
+  }
+  .navbar-container {
     height: 55px;
-    padding: 0 10px;
-  } /* Ajuste altura */
-  nav.navbar ul {
-    height: 55px;
+  }
+  .navbar-collapse {
+    top: 55px;
+  } /* Ajusta posição do menu mobile */
+  .navbar-collapse.show {
+    max-height: calc(100vh - 55px);
   }
   nav.navbar .logo-container img {
     max-height: 30px;
     margin-right: 10px;
   }
-  nav.navbar a {
-    font-size: 0.8em;
-    padding: 6px 8px;
-  } /* Reduz fonte/padding menu */
+  /* Aplica ao A dentro do LI dentro do UL dentro do .navbar-collapse */
+  .navbar-collapse ul li a {
+    font-size: 0.95em;
+    padding: 11px 15px;
+  }
+  .navbar-collapse ul ul.dropdown-menu li a {
+    font-size: 0.88em;
+    padding: 9px 15px 9px 30px;
+  }
   main.container {
     padding: 15px;
-    margin: 20px auto;
+    margin: 15px auto;
   }
   h1 {
     font-size: 1.5em;
@@ -528,5 +793,5 @@ a:hover {
   td {
     padding: 8px 10px;
     font-size: 0.85em;
-  } /* Ajuste padding tabela */
+  }
 }
