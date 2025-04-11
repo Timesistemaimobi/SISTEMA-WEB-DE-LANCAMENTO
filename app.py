@@ -872,49 +872,56 @@ def formatador_tabela_precos_map_etapas():
     tool_prefix = 'tab_precos_'
     session_key = f'{tool_prefix}info'
 
-    # Verifica se temos informações na sessão
+    # --- Bloco de verificação de sessão e arquivo ---
     if session_key not in session or 'filename' not in session[session_key] or 'unique_blocks' not in session[session_key]:
         flash('Sessão expirada ou inválida. Por favor, faça o upload novamente.', 'warning')
-        return redirect(url_for('formatador_tabela_precos_upload'))
+        return redirect(url_for('formatador_tabela_precos_upload')) # Redireciona para a função de upload
 
     session_data = session[session_key]
     temp_filename = session_data['filename']
-    unique_blocks = session_data['unique_blocks']
+    unique_blocks = session_data['unique_blocks'] # Usado no GET e para pegar names no POST
     temp_filepath = os.path.join(app.config['UPLOAD_FOLDER'], temp_filename)
 
-    # Verifica se o arquivo temporário ainda existe
     if not os.path.exists(temp_filepath):
         flash('Arquivo temporário não encontrado. Por favor, faça o upload novamente.', 'error')
         session.pop(session_key, None)
         return redirect(url_for('formatador_tabela_precos_upload'))
+    # --- Fim do bloco de verificação ---
+
 
     if request.method == 'POST':
         # --- Processamento Final após Mapeamento ---
-        block_mapping = {}
-        all_stages_defined = True
-        for block in unique_blocks:
-            stage_name = request.form.get(f'stage_for_{block}')
-            if not stage_name or not stage_name.strip():
-                all_stages_defined = False
-                flash(f'Erro: Etapa não definida para o bloco "{block}".', 'error')
-                break # Para na primeira falha
-            block_mapping[block] = stage_name.strip().upper() # Guarda mapeamento, Etapa em maiúsculas
 
-        if not all_stages_defined:
-            # Renderiza a página de mapeamento novamente com os erros
-            return render_template(
-                'map_etapas_blocos.html', # Certifique-se que o nome do template está correto
-                active_page='formatador_tabela_precos',
-                unique_blocks=unique_blocks,
-                form_data=request.form # Passa os dados do form para repopular
-            )
+        block_mapping = {} # Inicializa para evitar UnboundLocalError
+        output_stream = None # Inicializa para o finally
 
-        print(f"(Tabela Preços Mapeamento) Mapeamento recebido: {block_mapping}")
+        # --- Recria o mapeamento a partir dos dados enviados ---
+        print(f"(Tabela Preços Mapeamento) Montando mapeamento a partir do form POST...")
+        for block_name_original in unique_blocks:
+             stage_assigned = request.form.get(f'stage_for_{block_name_original}', '').strip().upper()
+             if stage_assigned:
+                 block_mapping[block_name_original] = stage_assigned
+             else:
+                 # Tratamento se etapa estiver vazia (não deveria acontecer com validação JS)
+                 print(f"AVISO BACKEND: Etapa VAZIA para o bloco '{block_name_original}' recebida no POST final.")
+                 flash(f"Aviso: O bloco '{block_name_original}' foi enviado sem etapa definida. Verifique o resultado.", "warning")
+                 # Considere impedir o processamento se isso for crítico:
+                 # flash(f"Erro Crítico: O bloco '{block_name_original}' foi enviado sem etapa. Tente novamente.", "error")
+                 # return redirect(url_for('formatador_tabela_precos_map_etapas'))
 
-        output_stream = None
+        print(f"(Tabela Preços Mapeamento) Mapeamento final montado: {block_mapping}")
+
+
+        # --- Bloco try para processamento e envio ---
         try:
-            # Chama a função de processamento principal passando o mapeamento
-            output_stream = processar_tabela_precos_web(temp_filepath, block_mapping) # <---- PASSA O MAPEAMENTO
+            # Validação extra (opcional, mas recomendada)
+            if len(block_mapping) != len(unique_blocks):
+                 raise ValueError(f"Inconsistência no mapeamento recebido. Esperados {len(unique_blocks)} blocos, recebidos {len(block_mapping)}. Tente novamente.")
+
+            # Chama a função de processamento
+            print(f"(Tabela Preços Mapeamento) Chamando processar_tabela_precos_web...")
+            output_stream = processar_tabela_precos_web(temp_filepath, block_mapping)
+            print(f"(Tabela Preços Mapeamento) Processamento concluído. Preparando envio...")
 
             # Define o nome do arquivo de saída
             input_basename = temp_filename.replace(f"{tool_prefix}", "").rsplit('.', 1)[0]
@@ -928,44 +935,46 @@ def formatador_tabela_precos_map_etapas():
                 as_attachment=True,
                 download_name=output_filename
             )
-            # Limpa a sessão APÓS preparar o send_file
-            session.pop(session_key, None)
-            return response
+            session.pop(session_key, None) # Limpa sessão APÓS SUCESSO
+            print(f"(Tabela Preços Processo Final) Arquivo enviado, sessão limpa.")
+            return response # Retorna a resposta com o arquivo
 
-        except ValueError as ve:
+        except ValueError as ve: # Erro de validação ou processamento esperado
             flash(f"Erro ao processar: {ve}", 'error')
             print(f"(Tabela Preços Processo Final) Erro de validação: {ve}")
-        except Exception as e:
+            # Não limpa sessão, permite tentar corrigir no mapeamento
+            return redirect(url_for('formatador_tabela_precos_map_etapas')) # Redireciona de volta para o mapeamento
+        except Exception as e: # Erro inesperado
             flash(f"Erro inesperado ao processar Tabela de Preços: {e}", 'error')
             print(f"(Tabela Preços Processo Final) Erro inesperado: {e}")
             traceback.print_exc()
+            session.pop(session_key, None) # Limpa sessão em erro grave
+            return redirect(url_for('formatador_tabela_precos_upload')) # Redireciona para o início
         finally:
-            # Garante a limpeza do arquivo temporário SEMPRE
+            # --- Bloco finally para limpar arquivo temporário e stream em caso de erro pré-envio ---
             if os.path.exists(temp_filepath):
                 try:
                     os.remove(temp_filepath)
-                    print(f"(Tabela Preços Processo Final) Temp removido: {temp_filepath}")
+                    print(f"(Tabela Preços Processo Final - Finally) Temp removido: {temp_filepath}")
                 except OSError as oe:
-                    print(f"(Tabela Preços Processo Final) Erro remover temp: {oe}")
-            # Fecha o stream SOMENTE se ocorreu erro ANTES do send_file
-            if output_stream and not ('response' in locals()): # Se response não foi criado, houve erro
-                 try: output_stream.close()
-                 except: pass
+                    print(f"(Tabela Preços Processo Final - Finally) Erro remover temp: {oe}")
+            # Fecha o stream SOMENTE se ocorreu erro ANTES do send_file ter sido retornado
+            # Verifica se 'response' existe E se é um stream (para evitar fechar em erros que não geram stream)
+            if output_stream and not ('response' in locals() and hasattr(response, 'is_streamed') and response.is_streamed):
+                 try:
+                     output_stream.close()
+                     print(f"(Tabela Preços Processo Final - Finally) Output stream fechado devido a erro prévio.")
+                 except Exception as close_err:
+                     print(f"(Tabela Preços Processo Final - Finally) Erro ao fechar output stream: {close_err}")
+            # --- Fim do bloco finally ---
 
-
-        # Se chegou aqui, houve erro durante o processamento final
-        # Redireciona de volta para a página de mapeamento (mantendo a sessão ativa)
-        # Ou talvez para a página inicial? Vamos redirecionar para a inicial para forçar re-upload.
-        session.pop(session_key, None) # Limpa sessão em caso de erro grave
-        return redirect(url_for('formatador_tabela_precos_upload'))
-
-
-    else: # Método GET para /map-etapas
-        # Renderiza a página de mapeamento
+    else: # Método GET para /map-etapas (ESSENCIAL!)
+        # Renderiza a página de mapeamento, passando a lista de blocos da sessão
+        print(f"(Tabela Preços Mapeamento - GET) Renderizando página de mapeamento com blocos: {unique_blocks}")
         return render_template(
-            'map_etapas_blocos.html', # Certifique-se que o nome do template está correto
+            'map_etapas_blocos.html',
             active_page='formatador_tabela_precos',
-            unique_blocks=unique_blocks
+            unique_blocks=unique_blocks # Passa a lista para o template renderizar os blocos pendentes
         )
 
 # --- Roda a aplicação ---

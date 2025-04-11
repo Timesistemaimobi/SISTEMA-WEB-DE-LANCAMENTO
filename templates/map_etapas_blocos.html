@@ -1,71 +1,563 @@
 {% extends "base.html" %} {# Ou o seu template base #} {% block title %}Mapear
-Blocos por Etapa - Tabela de Preços{% endblock %} {% block content %}
+Blocos por Etapa - Tabela de Preços{% endblock %} {% block styles %} {{ super()
+}} {# Inclui estilos do base.html se houver #}
+<style>
+  /* --- Tema Escuro - Ajustes Gerais --- */
+  /* Assumindo que o fundo principal da página já é escuro */
+  /* Definimos uma cor de texto padrão clara para o container do form */
+  #map-stages-form,
+  #map-stages-form label,
+  #map-stages-form h5 {
+    color: #dee2e6; /* Cinza claro Bootstrap (ou use #fff / white) */
+  }
+
+  /* --- Seção de Ações --- */
+  .action-section {
+    background-color: #343a40; /* Cinza escuro Bootstrap */
+    padding: 1rem 1.25rem;
+    border-radius: 0.375rem;
+    margin-bottom: 1.5rem;
+    border: 1px solid #495057; /* Borda um pouco mais clara que o fundo */
+  }
+  .action-section h5 {
+    color: #f8f9fa; /* Texto quase branco para destaque */
+    border-bottom: 1px solid #495057;
+    padding-bottom: 0.5rem;
+    margin-bottom: 1rem;
+  }
+  /* Ajusta cor do label do Select All */
+  .action-section .form-check-label {
+    color: #dee2e6;
+  }
+  /* Ajusta cor do label do select */
+  .action-section .form-label {
+    color: #adb5bd; /* Cinza mais suave */
+    font-size: 0.9em;
+  }
+  /* Estilo para o select/dropdown (pode precisar de mais ajustes dependendo do tema base) */
+  .action-section .form-select {
+    background-color: #495057; /* Fundo mais escuro que a seção */
+    color: #fff; /* Texto branco */
+    border-color: #6c757d; /* Borda cinza médio */
+  }
+
+  .action-section .row > .col-md-6:nth-child(2) {
+    /* Seleciona o segundo col-md-6 */
+    margin-top: 0.75rem; /* Ajuste este valor conforme necessário (ex: 1rem, 0.5rem) */
+  }
+  /* Estilo para o botão de atribuir (mantém info, mas pode ajustar se quiser) */
+  /* .action-section #assign-stage-button { ... } */
+
+  /* --- Colunas de Listas --- */
+  .block-list-column {
+    border: 1px solid #495057; /* Mesma borda da action section */
+    padding: 1rem;
+    height: 450px;
+    overflow-y: auto;
+    border-radius: 0.375rem;
+    background-color: #212529; /* Fundo bem escuro (padrão dark Bootstrap) */
+    margin-bottom: 1.5rem;
+  }
+  .block-list-column h5 {
+    color: #f8f9fa; /* Texto quase branco */
+    border-bottom: 1px solid #495057;
+    padding-bottom: 0.5rem;
+    margin-bottom: 1rem;
+  }
+
+  /* --- Itens na Lista de Pendentes --- */
+  .block-item {
+    display: flex;
+    align-items: center;
+    padding: 0.4rem 0.25rem;
+    margin-bottom: 0.15rem;
+    border-bottom: 1px dashed #495057; /* Borda pontilhada mais escura */
+    transition: background-color 0.2s ease-in-out;
+  }
+  .block-item:last-child {
+    border-bottom: none;
+  }
+  /* Efeito hover escurece um pouco */
+  .block-item:hover {
+    background-color: #343a40; /* Mesmo cinza da action section */
+  }
+  .block-item input[type="checkbox"] {
+    margin-right: 0.75rem;
+    flex-shrink: 0;
+    cursor: pointer;
+    /* Ajuste para checkbox ficar mais visível em fundo escuro (pode variar) */
+    filter: invert(1) hue-rotate(180deg); /* Tentativa de inverter cores */
+  }
+  .block-name {
+    flex-grow: 1;
+    margin-right: 0.5rem;
+    cursor: default;
+    color: #dee2e6; /* Texto claro */
+  }
+
+  /* --- Seção de Blocos Atribuídos --- */
+  .assigned-stage-group {
+    margin-bottom: 1rem;
+  }
+  .assigned-stage-group h5 {
+    margin-top: 0.5rem;
+    margin-bottom: 0.5rem;
+    padding-bottom: 0.3rem;
+    /* Mantém a cor azul para destaque, mas usa borda mais clara */
+    border-bottom: 1px solid #495057; /* Borda cinza */
+    color: #58a6ff; /* Azul um pouco mais claro para contraste em fundo escuro */
+    font-size: 0.95rem;
+    font-weight: bold;
+  }
+  #assigned-blocks-container .assigned-stage-group:first-child h5 {
+    margin-top: 0;
+  }
+  .assigned-block-item {
+    padding: 0.2rem 0.6rem;
+    margin-bottom: 0.25rem;
+    background-color: #495057; /* Cinza médio */
+    border-radius: 1rem;
+    font-size: 0.85em;
+    display: inline-block;
+    margin-right: 0.3rem;
+    color: #f8f9fa; /* Texto quase branco */
+    border: 1px solid #6c757d; /* Borda cinza claro */
+  }
+
+  /* --- Mensagens "Nenhum Bloco" --- */
+  .no-items-message {
+    padding: 2rem 1rem;
+    text-align: center;
+    color: #6c757d; /* Cinza muted Bootstrap (geralmente funciona em dark) */
+    font-style: italic;
+  }
+
+  /* --- Classe para esconder itens movidos (mantida) --- */
+  .assigned-hidden {
+    display: none !important;
+  }
+
+  /* --- Botões Finais --- */
+  .final-buttons {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 1rem;
+  }
+  .final-buttons .btn {
+    min-width: 120px;
+    /* Os botões padrão do Bootstrap (secondary, primary) devem funcionar ok */
+  }
+
+  .final-buttons > div:first-child {
+    margin-right: 1rem; /* Ajuste 1rem como desejado (pode ser 1.5rem, 2rem, etc.) */
+  }
+
+  .final-buttons .text-danger {
+    text-align: right;
+    margin-left: 1.5rem;
+    /* Cor 'danger' padrão geralmente funciona, mas pode clarear se precisar */
+    /* color: #ff8c8c; */
+  }
+
+  /* Adicione ou modifique esta regra dentro do bloco <style> */
+  #assign-stage-button {
+    /* Removemos a classe btn-info no HTML ou sobrescrevemos aqui */
+    background-color: #198754; /* Verde 'success' Bootstrap (ajuste se o seu verde for diferente) */
+    border-color: #198754;
+    color: #fff;
+    transition: background-color 0.15s ease-in-out,
+      border-color 0.15s ease-in-out;
+  }
+
+  #assign-stage-button:hover {
+    background-color: #157347; /* Verde mais escuro */
+    border-color: #146c43;
+    color: #fff;
+  }
+
+  /* Ajuste para o ícone */
+  #assign-stage-button i {
+    color: inherit;
+    margin-right: 0.4rem;
+  }
+</style>
+{% endblock %} {% block content %}
 <div class="container mt-4">
   <h2 class="mb-4">Formatar Tabela de Preços - Mapear Blocos por Etapa</h2>
 
-  {% include '_messages.html' %} {# Inclui mensagens flash se você tiver um
-  template para isso #}
+  {% include '_messages.html' %}
 
   <p>
-    Por favor, defina a qual etapa cada bloco/quadra pertence. A ordem final no
-    Excel seguirá a ordem numérica/alfabética das etapas e, dentro de cada
-    etapa, a ordem numérica dos blocos.
+    Selecione os blocos na lista "Blocos Pendentes", escolha a etapa no menu
+    suspenso e clique em "Atribuir Etapa". Os blocos serão visualmente movidos
+    para a lista "Blocos Atribuídos". Repita até que a lista de pendentes esteja
+    visualmente vazia. Ao finalizar, clique em "Processar Tabela com Etapas".
   </p>
 
   <form
     method="POST"
     action="{{ url_for('formatador_tabela_precos_map_etapas') }}"
+    id="map-stages-form"
   >
-    {# Você pode adicionar CSRF token aqui se estiver usando Flask-WTF #}
+    {# CSRF token se necessário #}
 
-    <table class="table table-striped table-bordered">
-      <thead class="thead-light">
-        <tr>
-          <th scope="col">Bloco / Quadra Encontrado</th>
-          <th scope="col">Nome da Etapa (Ex: ETAPA 01, FASE 2)</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for block in unique_blocks %}
-        <tr>
-          <td><strong>{{ block }}</strong></td>
-          <td>
+    <!-- Seção de Ações em Massa (mantida) -->
+    <div class="action-section">
+      <h2 class="mb-3">Ações em Massa (para Blocos Pendentes)</h2>
+      <div class="form-check mb-2">
+        <input
+          class="form-check-input"
+          type="checkbox"
+          value=""
+          id="select-all-checkbox"
+        />
+        <label class="form-check-label" for="select-all-checkbox">
+          Selecionar Todos / Desmarcar Todos (Pendentes Visíveis)
+        </label>
+      </div>
+      <div class="row g-2 align-items-end">
+        <div class="col-md-6">
+          <label for="bulk-stage-select" class="form-label"
+            >Etapa para Atribuir:</label
+          >
+          <select class="form-select" id="bulk-stage-select">
+            <option value="" selected disabled>-- Selecione a Etapa --</option>
+            {% for i in range(1, 11) %}
+            <option value="ETAPA {{ '%02d'|format(i) }}">
+              ETAPA {{ '%02d'|format(i) }}
+            </option>
+            {% endfor %}
+            <option value="ETAPA ÚNICA">ETAPA ÚNICA</option>
+          </select>
+        </div>
+        <div class="col-md-6">
+          <button
+            type="button"
+            class="btn btn-info w-100"
+            id="assign-stage-button"
+          >
+            <i class="fas fa-check-double"></i> Atribuir Etapa aos Selecionados
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Colunas de Blocos -->
+    <div class="row">
+      <!-- Coluna de Blocos Pendentes (Visuais) -->
+      <div class="col-md-6">
+        <h5>Blocos Pendentes</h5>
+        <div id="unassigned-block-list" class="block-list-column">
+          {% for block in unique_blocks %} {# O Div principal do item visual #}
+          <div
+            class="block-item"
+            id="item_block_vis_{{ block|replace(' ', '_')|replace('/', '_')|replace('\\', '_') }}"
+          >
             <input
-              type="text"
-              class="form-control {% if form_data and not form_data.get('stage_for_' + block) %}is-invalid{% endif %}"
-              name="stage_for_{{ block }}"
-              id="stage_for_{{ block }}"
-              value="{{ form_data.get('stage_for_' + block, '') if form_data else '' }}"
-              {#
-              Repopula
-              se
-              houve
-              erro
-              #}
-              required
-              placeholder="Digite o nome da Etapa"
+              class="form-check-input block-checkbox-unassigned"
+              type="checkbox"
+              value="{{ block }}"
+              id="check_block_{{ loop.index }}"
+              data-block-name="{{ block }}"
             />
-            {% if form_data and not form_data.get('stage_for_' + block) %}
-            <div class="invalid-feedback">
-              Por favor, defina a etapa para este bloco.
-            </div>
-            {% endif %}
-          </td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
+            {# Usado para encontrar o input oculto #}
 
+            <label
+              class="form-check-label block-name"
+              for="check_block_{{ loop.index }}"
+            >
+              {{ block }}
+            </label>
+          </div>
+          {% endfor %}
+          <div
+            id="no-pending-blocks"
+            class="text-muted text-center mt-3"
+            style="display: none"
+          >
+            Nenhum bloco pendente visível.
+          </div>
+        </div>
+      </div>
+
+      <!-- Coluna de Blocos Atribuídos (Visuais) -->
+      <div class="col-md-6">
+        <h5>Blocos Atribuídos</h5>
+        <div id="assigned-blocks-container" class="block-list-column">
+          <div id="no-assigned-blocks" class="text-muted text-center mt-3">
+            Nenhum bloco atribuído ainda.
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Container OCULTO para os INPUTS que serão enviados -->
+    <div id="hidden-inputs-container" style="display: none">
+      {% for block in unique_blocks %}
+      <input
+        type="hidden"
+        name="stage_for_{{ block }}"
+        {#
+        O
+        nome
+        que
+        o
+        Flask
+        espera
+        #}
+        id="hidden_stage_for_{{ block|replace(' ', '_')|replace('/', '_')|replace('\\', '_') }}"
+        {#
+        id
+        único
+        para
+        JS
+        #}
+        value=""
+        {#
+        Valor
+        inicial
+        vazio
+        #}
+        data-block-ref="{{ block }}"
+      />
+      {# Referência ao nome original #} {% endfor %}
+    </div>
+
+    <!-- Botões Finais (mantidos) -->
     <div class="mt-4">
       <a
         href="{{ url_for('formatador_tabela_precos_upload') }}"
         class="btn btn-secondary"
-        >Cancelar / Voltar</a
       >
+        <i class="fas fa-arrow-left"></i> Cancelar / Voltar
+      </a>
       <button type="submit" class="btn btn-primary">
-        Processar Tabela com Etapas
+        <i class="fas fa-cogs"></i> Processar Tabela com Etapas
       </button>
+      <small id="form-validation-error" class="text-danger ms-3 d-none"
+        >Existem blocos pendentes. Por favor, atribua uma etapa a todos eles
+        antes de processar.</small
+      >
     </div>
   </form>
 </div>
+
+{% endblock %} {% block scripts %} {{ super() }}
+<script>
+  document.addEventListener("DOMContentLoaded", function () {
+    const selectAllCheckbox = document.getElementById("select-all-checkbox");
+    const unassignedList = document.getElementById("unassigned-block-list"); // Lista visual
+    const assignButton = document.getElementById("assign-stage-button");
+    const bulkStageSelect = document.getElementById("bulk-stage-select");
+    const mapStagesForm = document.getElementById("map-stages-form");
+    const validationErrorMsg = document.getElementById("form-validation-error");
+    const assignedContainer = document.getElementById(
+      "assigned-blocks-container"
+    ); // Container visual
+    const noPendingMsg = document.getElementById("no-pending-blocks");
+    const noAssignedMsg = document.getElementById("no-assigned-blocks");
+    // Container dos inputs que realmente serão submetidos
+    const hiddenInputsContainer = document.getElementById(
+      "hidden-inputs-container"
+    );
+
+    // Função helper para gerar ID seguro (consistente com Jinja)
+    function getSafeIdPart(name) {
+      if (typeof name !== "string") name = String(name);
+      return name.replace(/ /g, "_").replace(/\//g, "_").replace(/\\/g, "_");
+    }
+
+    // Função helper para verificar blocos pendentes VISÍVEIS
+    function checkVisiblePendingBlocks() {
+      // Conta os itens visuais que NÃO têm a classe 'assigned-hidden'
+      const pendingItems = unassignedList.querySelectorAll(
+        ".block-item:not(.assigned-hidden)"
+      );
+      if (pendingItems.length === 0) {
+        noPendingMsg.style.display = "block";
+        validationErrorMsg.classList.add("d-none");
+        selectAllCheckbox.disabled = true;
+        selectAllCheckbox.checked = false;
+      } else {
+        noPendingMsg.style.display = "none";
+        selectAllCheckbox.disabled = false;
+      }
+      return pendingItems.length; // Retorna a contagem
+    }
+
+    // Função helper para verificar se há blocos atribuídos visualmente
+    function checkAssignedBlocks() {
+      const assignedGroups = assignedContainer.querySelectorAll(
+        ".assigned-stage-group"
+      );
+      noAssignedMsg.style.display =
+        assignedGroups.length === 0 ? "block" : "none";
+    }
+
+    // --- Lógica para Selecionar Todos / Nenhum (APENAS PENDENTES VISÍVEIS) ---
+    selectAllCheckbox.addEventListener("change", function () {
+      const visibleCheckboxes = unassignedList.querySelectorAll(
+        ".block-item:not(.assigned-hidden) .block-checkbox-unassigned"
+      );
+      visibleCheckboxes.forEach((checkbox) => {
+        checkbox.checked = this.checked;
+      });
+    });
+
+    // Atualiza "Selecionar Todos" se um checkbox PENDENTE VISÍVEL mudar
+    unassignedList.addEventListener("change", function (event) {
+      if (event.target.classList.contains("block-checkbox-unassigned")) {
+        // Verifica apenas entre os checkboxes visíveis (não escondidos)
+        const visibleCheckboxes = unassignedList.querySelectorAll(
+          ".block-item:not(.assigned-hidden) .block-checkbox-unassigned"
+        );
+        if (!event.target.checked) {
+          selectAllCheckbox.checked = false;
+        } else {
+          let allChecked = true;
+          visibleCheckboxes.forEach((cb) => {
+            if (!cb.checked) {
+              allChecked = false;
+            }
+          });
+          selectAllCheckbox.checked = allChecked;
+        }
+      }
+    });
+
+    // --- Lógica para Atribuir Etapa aos Selecionados ---
+    assignButton.addEventListener("click", function () {
+      const stageName = bulkStageSelect.value;
+
+      if (!stageName) {
+        alert("Por favor, selecione a Etapa que deseja atribuir.");
+        bulkStageSelect.focus();
+        return;
+      }
+
+      // Seleciona apenas checkboxes VISÍVEIS e MARCADOS
+      const selectedCheckboxes = unassignedList.querySelectorAll(
+        ".block-item:not(.assigned-hidden) .block-checkbox-unassigned:checked"
+      );
+
+      if (selectedCheckboxes.length === 0) {
+        alert(
+          "Por favor, selecione pelo menos um Bloco Pendente para atribuir a etapa."
+        );
+        return;
+      }
+
+      // Gera ID seguro para o grupo da etapa visual
+      const stageGroupId = `stage-group-${getSafeIdPart(stageName)}`;
+      let stageGroupContainer = document.getElementById(stageGroupId);
+      if (!stageGroupContainer) {
+        stageGroupContainer = document.createElement("div");
+        stageGroupContainer.id = stageGroupId;
+        stageGroupContainer.classList.add("assigned-stage-group");
+        stageGroupContainer.innerHTML = `<h5>${stageName}</h5>`;
+        assignedContainer.appendChild(stageGroupContainer);
+        // Ordena os grupos visuais
+        const sortedGroups = Array.from(
+          assignedContainer.querySelectorAll(".assigned-stage-group")
+        ).sort((a, b) =>
+          a
+            .querySelector("h5")
+            .textContent.localeCompare(b.querySelector("h5").textContent)
+        );
+        sortedGroups.forEach((group) => assignedContainer.appendChild(group));
+      }
+
+      selectedCheckboxes.forEach((checkbox) => {
+        const blockName = checkbox.dataset.blockName;
+        const safeBlockIdPart = getSafeIdPart(blockName);
+        // Encontra o input oculto REAL que será submetido
+        const hiddenInput = document.getElementById(
+          `hidden_stage_for_${safeBlockIdPart}`
+        );
+        // Encontra o div VISUAL do item pendente
+        const blockItemVisualDiv = document.getElementById(
+          `item_block_vis_${safeBlockIdPart}`
+        );
+
+        // 1. ATUALIZA O VALOR DO INPUT OCULTO (ESSENCIAL!)
+        if (hiddenInput) {
+          hiddenInput.value = stageName;
+          console.log(
+            `Valor do input oculto para '${blockName}' definido como '${stageName}'`
+          );
+        } else {
+          console.error(
+            `Input oculto REAL não encontrado para o bloco: ${blockName} (ID: hidden_stage_for_${safeBlockIdPart})`
+          );
+          // Considerar mostrar um erro ao usuário aqui
+        }
+
+        // 2. ATUALIZA A INTERFACE VISUAL
+        if (blockItemVisualDiv) {
+          // Cria um novo item visual para a lista de atribuídos
+          const assignedItem = document.createElement("div");
+          assignedItem.classList.add("assigned-block-item");
+          assignedItem.textContent = blockName;
+          stageGroupContainer.appendChild(assignedItem); // Adiciona ao grupo da etapa
+
+          // Esconde o item da lista de pendentes em vez de remover
+          blockItemVisualDiv.classList.add("assigned-hidden");
+          checkbox.checked = false; // Desmarca o checkbox
+        } else {
+          console.error(
+            `Div VISUAL do item não encontrado para o bloco: ${blockName} (ID: item_block_vis_${safeBlockIdPart})`
+          );
+        }
+      });
+
+      // Reseta o select, desmarca "Selecionar Todos" e atualiza contadores visuais
+      bulkStageSelect.value = "";
+      selectAllCheckbox.checked = false;
+      checkVisiblePendingBlocks(); // Atualiza a mensagem "Nenhum pendente" se for o caso
+      checkAssignedBlocks(); // Garante que a mensagem "Nenhum atribuído" suma
+
+      console.log(
+        `Etapa "${stageName}" atribuída visualmente a ${selectedCheckboxes.length} blocos.`
+      );
+    });
+
+    // --- Validação ANTES de submeter o formulário principal (CORRIGIDA) ---
+    mapStagesForm.addEventListener("submit", function (event) {
+      // Valida checando se algum dos INPUTS OCULTOS ainda está VAZIO
+      let allAssigned = true;
+      const hiddenInputs = hiddenInputsContainer.querySelectorAll(
+        'input[type="hidden"][name^="stage_for_"]'
+      );
+
+      hiddenInputs.forEach((input) => {
+        if (!input.value || !input.value.trim()) {
+          allAssigned = false;
+          const blockRef =
+            input.dataset.blockRef || input.name.replace("stage_for_", ""); // Pega nome original
+          console.warn(
+            `Input oculto para Bloco '${blockRef}' (name: ${input.name}) está vazio.`
+          );
+        }
+      });
+
+      if (!allAssigned) {
+        validationErrorMsg.classList.remove("d-none"); // Mostra a mensagem de erro
+        event.preventDefault(); // Impede a submissão do formulário
+        alert(
+          'Erro: Existem blocos que ainda não tiveram uma etapa atribuída. Use a seção "Ações em Massa" para atribuir as etapas restantes.'
+        );
+      } else {
+        validationErrorMsg.classList.add("d-none"); // Esconde a mensagem se tudo OK
+        console.log(
+          "Validação JS final passou: Todos os inputs ocultos têm valor."
+        );
+      }
+    });
+
+    // Verifica estado inicial das listas ao carregar
+    checkVisiblePendingBlocks();
+    checkAssignedBlocks();
+  });
+</script>
 {% endblock %}
