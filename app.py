@@ -1,4 +1,5 @@
 import pandas as pd
+import numpy as np
 import os
 import io # Para trabalhar com CSV/Excel em memória
 import unicodedata
@@ -12,7 +13,9 @@ from flask import (
     send_file, flash, session, abort
 )
 from werkzeug.utils import secure_filename
+from formatadores.tabela_precos_formatador import find_column_flexible, normalize_text_for_match, extract_block_number_safe
 from formatadores.tabela_precos_formatador import processar_tabela_precos_web
+
 
 # --- Constantes ---
 TIPOLOGIAS_PADRAO = {
@@ -779,76 +782,190 @@ def formatador_lote_tool():
     
 # === ROTA PARA FORMATADOR TABELA DE PREÇOS ===
 @app.route('/formatador-tabela-precos', methods=['GET', 'POST'])
-def formatador_tabela_precos_tool():
-    tool_prefix = 'tab_precos_' # Prefixo para nome de arquivo temporário
-    temp_filepath = None
-    output_stream = None
+def formatador_tabela_precos_upload():
+    tool_prefix = 'tab_precos_'
+    session_key = f'{tool_prefix}info'
+    print("DEBUG: Entrando em formatador_tabela_precos_upload, Método:", request.method)
 
     if request.method == 'POST':
-        # Validação do upload
+        print("DEBUG: Processando POST")
+        # --- Upload e Leitura Inicial ---
         if 'arquivo_entrada' not in request.files:
             flash('Nenhum arquivo selecionado!', 'error')
-            return redirect(url_for('formatador_tabela_precos_tool'))
+            return redirect(url_for('formatador_tabela_precos_upload'))
         file = request.files['arquivo_entrada']
         if file.filename == '':
             flash('Nenhum arquivo selecionado!', 'error')
-            return redirect(url_for('formatador_tabela_precos_tool'))
+            print("DEBUG: Retornando redirect - sem arquivo_entrada")
+            return redirect(url_for('formatador_tabela_precos_upload'))
         if not file or not allowed_file(file.filename): # Reutiliza a função global
             flash('Tipo de arquivo inválido. Use .xlsx ou .xls.', 'error')
-            return redirect(url_for('formatador_tabela_precos_tool'))
+            return redirect(url_for('formatador_tabela_precos_upload'))
 
-        # Gera nome seguro e caminho temporário
         filename = secure_filename(f"{tool_prefix}{file.filename}")
         temp_filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
 
         try:
-            # Salva o arquivo temporariamente
             file.save(temp_filepath)
-            print(f"(Tabela Preços Rota) Arquivo temporário salvo: {temp_filepath}")
+            print(f"(Tabela Preços Upload) Arquivo temporário salvo: {temp_filepath}")
 
-            # Chama a função de processamento específica IMPORTADA
-            output_stream = processar_tabela_precos_web(temp_filepath) # <<< CHAMA A FUNÇÃO IMPORTADA
+            # --- Ler o Excel para encontrar Blocos ---
+            NUMERO_DA_LINHA_DO_CABECALHO_NO_EXCEL = 3 # Manter consistente
+            linhas_para_pular = NUMERO_DA_LINHA_DO_CABECALHO_NO_EXCEL - 1
+            df_check = pd.read_excel(temp_filepath, engine='openpyxl', skiprows=linhas_para_pular, header=0, dtype=str).fillna('')
+            if df_check.empty:
+                 raise ValueError("Planilha vazia ou sem dados após cabeçalho.")
+
+            # Encontrar coluna de Bloco/Quadra (reusa lógica do formatador)
+            bloco_col_name = find_column_flexible(df_check.columns, ['bloco', 'blk', 'quadra'], 'BLOCO', required=True)
+
+            # Obter valores únicos e preenchidos (ffill)
+            unique_blocks_raw = df_check[bloco_col_name].replace('', np.nan).ffill().dropna().unique().tolist()
+
+            if not unique_blocks_raw:
+                 raise ValueError("Nenhum valor de Bloco/Quadra encontrado na coluna correspondente.")
+
+            # Limpa e garante que sejam strings
+            unique_blocks = sorted(list(set(str(b).strip() for b in unique_blocks_raw if str(b).strip())),
+                                   key=lambda b: extract_block_number_safe(b) if extract_block_number_safe(b) is not None else float('inf')) # Ordena numericamente se possível
+
+
+            print(f"(Tabela Preços Upload) Blocos únicos encontrados: {unique_blocks}")
+
+            # Armazena na sessão e redireciona para o mapeamento
+            session[session_key] = {'filename': filename, 'unique_blocks': unique_blocks}
+            print("DEBUG: Retornando redirect para map_etapas (try bem-sucedido)")
+            return redirect(url_for('formatador_tabela_precos_map_etapas'))
+
+        except ValueError as ve:
+             flash(f"Erro ao ler arquivo: {ve}", 'error')
+             print(f"(Tabela Preços Upload) Erro leitura/validação: {ve}")
+             if os.path.exists(temp_filepath): os.remove(temp_filepath) # Limpa temp
+             session.pop(session_key, None) # Limpa sessão
+             print("DEBUG: Retornando redirect após ValueError")
+             return redirect(url_for('formatador_tabela_precos_upload'))
+        except Exception as e:
+            flash(f"Erro inesperado ao ler arquivo: {e}", 'error')
+            print(f"(Tabela Preços Upload) Erro inesperado: {e}")
+            traceback.print_exc()
+            if os.path.exists(temp_filepath): os.remove(temp_filepath)
+            session.pop(session_key, None)
+            print("DEBUG: Retornando redirect após Exception geral")
+            return redirect(url_for('formatador_tabela_precos_upload'))
+        
+        print("!!!!! ERRO: Chegou ao fim do bloco POST sem return !!!!!")
+
+    else: # Método GET
+        print("DEBUG: Processando GET") # Adicione isto
+        # ... (lógica do GET) ...
+    print("DEBUG: Retornando render_template para upload inicial") # Adicione isto
+    return render_template(
+        'formatador_tabela_precos.html',
+        active_page='formatador_tabela_precos'
+)
+
+    print("!!!!! ERRO: Chegou ao fim da função SEM return !!!!!")
+        
+# --- NOVA ROTA para Mapeamento de Blocos e Etapas ---
+@app.route('/formatador-tabela-precos/map-etapas', methods=['GET', 'POST'])
+def formatador_tabela_precos_map_etapas():
+    tool_prefix = 'tab_precos_'
+    session_key = f'{tool_prefix}info'
+
+    # Verifica se temos informações na sessão
+    if session_key not in session or 'filename' not in session[session_key] or 'unique_blocks' not in session[session_key]:
+        flash('Sessão expirada ou inválida. Por favor, faça o upload novamente.', 'warning')
+        return redirect(url_for('formatador_tabela_precos_upload'))
+
+    session_data = session[session_key]
+    temp_filename = session_data['filename']
+    unique_blocks = session_data['unique_blocks']
+    temp_filepath = os.path.join(app.config['UPLOAD_FOLDER'], temp_filename)
+
+    # Verifica se o arquivo temporário ainda existe
+    if not os.path.exists(temp_filepath):
+        flash('Arquivo temporário não encontrado. Por favor, faça o upload novamente.', 'error')
+        session.pop(session_key, None)
+        return redirect(url_for('formatador_tabela_precos_upload'))
+
+    if request.method == 'POST':
+        # --- Processamento Final após Mapeamento ---
+        block_mapping = {}
+        all_stages_defined = True
+        for block in unique_blocks:
+            stage_name = request.form.get(f'stage_for_{block}')
+            if not stage_name or not stage_name.strip():
+                all_stages_defined = False
+                flash(f'Erro: Etapa não definida para o bloco "{block}".', 'error')
+                break # Para na primeira falha
+            block_mapping[block] = stage_name.strip().upper() # Guarda mapeamento, Etapa em maiúsculas
+
+        if not all_stages_defined:
+            # Renderiza a página de mapeamento novamente com os erros
+            return render_template(
+                'map_etapas_blocos.html', # Certifique-se que o nome do template está correto
+                active_page='formatador_tabela_precos',
+                unique_blocks=unique_blocks,
+                form_data=request.form # Passa os dados do form para repopular
+            )
+
+        print(f"(Tabela Preços Mapeamento) Mapeamento recebido: {block_mapping}")
+
+        output_stream = None
+        try:
+            # Chama a função de processamento principal passando o mapeamento
+            output_stream = processar_tabela_precos_web(temp_filepath, block_mapping) # <---- PASSA O MAPEAMENTO
 
             # Define o nome do arquivo de saída
-            input_basename = file.filename.rsplit('.', 1)[0]
-            output_filename = f"{input_basename}_PRECOS_FORMATADO.xlsx"
-            print(f"(Tabela Preços Rota) Enviando arquivo processado: {output_filename}")
+            input_basename = temp_filename.replace(f"{tool_prefix}", "").rsplit('.', 1)[0]
+            output_filename = f"{input_basename}_PRECOS_ETAPAS_FORMATADO.xlsx"
+            print(f"(Tabela Preços Processo Final) Enviando arquivo processado: {output_filename}")
 
             # Envia o arquivo processado para download
-            return send_file(
+            response = send_file(
                 output_stream,
                 mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
                 as_attachment=True,
                 download_name=output_filename
             )
-        # Captura exceções específicas e genéricas do processamento
-        except ValueError as ve: # Erros esperados/validações da função de processamento
+            # Limpa a sessão APÓS preparar o send_file
+            session.pop(session_key, None)
+            return response
+
+        except ValueError as ve:
             flash(f"Erro ao processar: {ve}", 'error')
-            print(f"(Tabela Preços Rota) Erro de validação/processamento: {ve}")
-            # Não precisa de traceback completo para erros de validação
-        except Exception as e: # Erros inesperados (leitura de arquivo, etc.)
+            print(f"(Tabela Preços Processo Final) Erro de validação: {ve}")
+        except Exception as e:
             flash(f"Erro inesperado ao processar Tabela de Preços: {e}", 'error')
-            print(f"(Tabela Preços Rota) Erro inesperado na rota: {e}")
-            traceback.print_exc() # Log detalhado para erros inesperados
+            print(f"(Tabela Preços Processo Final) Erro inesperado: {e}")
+            traceback.print_exc()
+        finally:
+            # Garante a limpeza do arquivo temporário SEMPRE
+            if os.path.exists(temp_filepath):
+                try:
+                    os.remove(temp_filepath)
+                    print(f"(Tabela Preços Processo Final) Temp removido: {temp_filepath}")
+                except OSError as oe:
+                    print(f"(Tabela Preços Processo Final) Erro remover temp: {oe}")
+            # Fecha o stream SOMENTE se ocorreu erro ANTES do send_file
+            if output_stream and not ('response' in locals()): # Se response não foi criado, houve erro
+                 try: output_stream.close()
+                 except: pass
 
-        # Bloco finally para limpeza é importante, mas a execução chega aqui APENAS se houve erro
-        # A limpeza no 'finally' original que tínhamos era melhor pois executava sempre
-        # Vamos reintroduzir o finally para garantir a limpeza mesmo em caso de erro antes do send_file
 
-        # Tenta limpar em caso de erro antes de redirecionar
-        if temp_filepath and os.path.exists(temp_filepath):
-            try: os.remove(temp_filepath)
-            except OSError: pass
-        if output_stream:
-            try: output_stream.close()
-            except: pass
-        return redirect(url_for('formatador_tabela_precos_tool'))
+        # Se chegou aqui, houve erro durante o processamento final
+        # Redireciona de volta para a página de mapeamento (mantendo a sessão ativa)
+        # Ou talvez para a página inicial? Vamos redirecionar para a inicial para forçar re-upload.
+        session.pop(session_key, None) # Limpa sessão em caso de erro grave
+        return redirect(url_for('formatador_tabela_precos_upload'))
 
-    else: # Método GET
-        # Renderiza o template do formulário
+
+    else: # Método GET para /map-etapas
+        # Renderiza a página de mapeamento
         return render_template(
-            'formatador_tabela_precos.html',
-            active_page='formatador_tabela_precos' # Para destacar o menu correto
+            'map_etapas_blocos.html', # Certifique-se que o nome do template está correto
+            active_page='formatador_tabela_precos',
+            unique_blocks=unique_blocks
         )
 
 # --- Roda a aplicação ---

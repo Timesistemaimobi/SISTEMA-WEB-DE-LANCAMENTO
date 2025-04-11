@@ -1,0 +1,71 @@
+{% extends "base.html" %} {# Ou o seu template base #} {% block title %}Mapear
+Blocos por Etapa - Tabela de Preços{% endblock %} {% block content %}
+<div class="container mt-4">
+  <h2 class="mb-4">Formatar Tabela de Preços - Mapear Blocos por Etapa</h2>
+
+  {% include '_messages.html' %} {# Inclui mensagens flash se você tiver um
+  template para isso #}
+
+  <p>
+    Por favor, defina a qual etapa cada bloco/quadra pertence. A ordem final no
+    Excel seguirá a ordem numérica/alfabética das etapas e, dentro de cada
+    etapa, a ordem numérica dos blocos.
+  </p>
+
+  <form
+    method="POST"
+    action="{{ url_for('formatador_tabela_precos_map_etapas') }}"
+  >
+    {# Você pode adicionar CSRF token aqui se estiver usando Flask-WTF #}
+
+    <table class="table table-striped table-bordered">
+      <thead class="thead-light">
+        <tr>
+          <th scope="col">Bloco / Quadra Encontrado</th>
+          <th scope="col">Nome da Etapa (Ex: ETAPA 01, FASE 2)</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for block in unique_blocks %}
+        <tr>
+          <td><strong>{{ block }}</strong></td>
+          <td>
+            <input
+              type="text"
+              class="form-control {% if form_data and not form_data.get('stage_for_' + block) %}is-invalid{% endif %}"
+              name="stage_for_{{ block }}"
+              id="stage_for_{{ block }}"
+              value="{{ form_data.get('stage_for_' + block, '') if form_data else '' }}"
+              {#
+              Repopula
+              se
+              houve
+              erro
+              #}
+              required
+              placeholder="Digite o nome da Etapa"
+            />
+            {% if form_data and not form_data.get('stage_for_' + block) %}
+            <div class="invalid-feedback">
+              Por favor, defina a etapa para este bloco.
+            </div>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+
+    <div class="mt-4">
+      <a
+        href="{{ url_for('formatador_tabela_precos_upload') }}"
+        class="btn btn-secondary"
+        >Cancelar / Voltar</a
+      >
+      <button type="submit" class="btn btn-primary">
+        Processar Tabela com Etapas
+      </button>
+    </div>
+  </form>
+</div>
+{% endblock %}
