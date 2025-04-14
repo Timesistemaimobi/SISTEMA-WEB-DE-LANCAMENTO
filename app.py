@@ -13,8 +13,8 @@ from flask import (
     send_file, flash, session, abort
 )
 from werkzeug.utils import secure_filename
-from formatadores.tabela_precos_formatador import find_column_flexible, normalize_text_for_match, extract_block_number_safe
-from formatadores.tabela_precos_formatador import processar_tabela_precos_web
+from formatadores.tabela_preco_formatador import find_column_flexible, normalize_text_for_match, extract_block_number_safe
+from formatadores.tabela_preco_formatador import processar_tabela_precos_web
 
 
 # --- Constantes ---
