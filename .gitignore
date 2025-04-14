@@ -30,3 +30,4 @@ Thumbs.db
 *.sublime-project
 *.sublime-workspace
 .swp
+formatadores/tabela_precos_formatador.py
