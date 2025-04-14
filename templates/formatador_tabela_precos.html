@@ -1,14 +1,33 @@
 {# templates/formatador_tabela_precos.html #} {% extends 'base.html' %} {#
-Certifique-se que 'base.html' é o nome correto do seu layout base #} {% block
-title %}Formatação Tabela de Preços - EM CONSTRUÇÃO{% endblock %} {% block
-styles %} {# Adicione aqui CSS específico para esta página, se necessário (raro
-para formulários simples) #}
+Certifique-se que 'base.html' é o nome correto #} {% block title %}Formatar
+Tabela de Preços{% endblock %} {% block styles %} {{ super() }} {# Inclui
+estilos do base.html se houver #}
 <style>
-  /* Estilos opcionais específicos para esta página */
+  /* Estilos para os campos CSV */
+  #csv-options {
+    background-color: #e9ecef; /* Cor de fundo levemente diferente (Bootstrap bg-light) */
+    border: 1px solid #ced4da; /* Borda sutil */
+    padding: 1rem 1.25rem;
+    border-radius: 0.375rem;
+    margin-top: 1rem; /* Espaço acima das opções CSV */
+  }
+  #csv-options h5 {
+    margin-bottom: 1rem;
+    color: #495057;
+  }
+  #csv-options label {
+    font-size: 0.9em; /* Label um pouco menor */
+    color: #495057;
+  }
+
+  /* Estilos gerais mantidos da sua versão anterior */
   .description {
-    background-color: var(--flash-info-bg); /* Reutiliza cor de info */
-    color: var(--flash-info-text);
-    border: 1px solid var(--flash-info-border);
+    background-color: var(
+      --flash-info-bg,
+      #cfe2ff
+    ); /* Fallback se variável não definida */
+    color: var(--flash-info-text, #084298);
+    border: 1px solid var(--flash-info-border, #b6d4fe);
     padding: 15px;
     border-radius: 6px;
     margin-bottom: 25px;
@@ -16,135 +35,177 @@ para formulários simples) #}
     line-height: 1.5;
   }
   .form-container {
-    max-width: 600px; /* Limita a largura do formulário */
-    margin: 0 auto; /* Centraliza o formulário */
-    padding: 20px;
-    border: 1px solid var(--border-color);
+    max-width: 700px; /* Aumenta um pouco para acomodar opções CSV */
+    margin: 0 auto;
+    padding: 25px;
+    border: 1px solid var(--border-color, #dee2e6);
     border-radius: 8px;
-    background-color: var(
-      --container-bg
-    ); /* Usa fundo do container ou um pouco diferente */
+    background-color: var(--container-bg, #fff);
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
   }
-
-  /* Melhorar aparência do input file (complementa o styles.css geral) */
-  input[type="file"] {
-    border: 1px dashed var(--input-border);
-    padding: 15px;
+  /* Ajusta input file se necessário */
+  input[type="file"].form-control {
+    /* Aplica a inputs file com a classe form-control */
+    border: 1px dashed var(--input-border, #ced4da);
+    padding: 10px;
     text-align: center;
     cursor: pointer;
+    background-color: #495057; /* Fundo levemente cinza */
   }
-  input[type="file"]:hover {
-    border-color: var(--primary-color);
-    background-color: var(--table-row-hover-bg); /* Fundo sutil no hover */
+  input[type="file"].form-control:hover {
+    border-color: var(--primary-color, #0d6efd);
+    background-color: var(--table-row-hover-bg, #e9ecef);
   }
 </style>
 {% endblock %} {% block content %}
-<h1>Formatação - Tabela de Preços</h1>
+<div class="container mt-4">
+  {# Adiciona container Bootstrap padrão #}
+  <h1>Formatar Tabela de Preços</h1>
 
-<div class="description">
-  <p>
-    <strong>Instruções:</strong> Faça o upload da planilha de tabela de preços
-    original (formato similar ao exemplo "Dona Olivia Ciacci"). A ferramenta irá
-    processar os dados, reestruturar a planilha, aplicar formatações (valores,
-    áreas, moeda) e estilos visuais (cores, fontes, bordas) para gerar um novo
-    arquivo Excel (.xlsx) no layout padronizado, pronto para uso.
-  </p>
-  <p>
-    Certifique-se que a planilha de entrada contém as colunas essenciais:
-    <code>BLOCO</code>, <code>PAVIMENTO</code>, <code>APT</code>,
-    <code>TIPOLOGIA</code>, <code>ÁREA CONSTRUÍDA</code>, <code>QUINTAL</code>,
-    <code>VALOR DO IMÓVEL</code>.
-  </p>
-</div>
+  <div class="description">
+    <p>
+      <strong>Instruções:</strong> Faça o upload da planilha ou arquivo CSV. A
+      ferramenta irá processar os dados, permitir o mapeamento de blocos por
+      etapas (se necessário), e gerar um novo arquivo Excel (.xlsx) no layout
+      padronizado.
+    </p>
+    <p>
+      Certifique-se que o arquivo de entrada contém colunas reconhecíveis para:
+      <strong>Bloco/Quadra</strong>, <strong>Unidade</strong> (APT/CASA),
+      <strong>Tipologia</strong>, <strong>Área Construída/Privativa</strong>,
+      <strong>Quintal/Jardim</strong> (opcional),
+      <strong>Garagem</strong> (opcional), e <strong>Valor</strong>.
+    </p>
+  </div>
 
-<div class="form-container">
-  <form
-    method="post"
-    enctype="multipart/form-data"
-    action="{{ url_for('formatador_tabela_precos_upload') }}"
-  >
-    {# O CSRF token é geralmente tratado pelo Flask-WTF, se você usar
-    formularios WTForms. Se não usar, não é estritamente necessário para um
-    simples upload, mas considere medidas de segurança se a aplicação for
-    exposta. #} {{ form.csrf_token if form and form.csrf_token }} {# Exemplo se
-    usar WTForms #}
+  <div class="form-container">
+    <form
+      method="post"
+      enctype="multipart/form-data"
+      action="{{ url_for('formatador_tabela_precos_upload') }}"
+      id="upload-form"
+      {#
+      Adicionado
+      id
+      para
+      o
+      JS
+      #}
+    >
+      {# CSRF se usar WTForms #} {{ form.csrf_token if form and form.csrf_token
+      }}
 
-    <div class="form-group">
-      <label for="arquivo_entrada"
-        ><strong>Selecione a Planilha de Preços (.xlsx, .xls):</strong></label
-      >
-      {# 'form-control' é uma classe comum em frameworks como Bootstrap, mas os
-      estilos base em styles.css devem funcionar. Adicione se necessário. #}
-      <input
-        type="file"
-        id="arquivo_entrada"
-        name="arquivo_entrada"
-        accept=".xlsx, .xls"
-        required
-      />
-    </div>
-
-    {# --- Seção para Parâmetros Adicionais (Opcional) --- Se você precisar de
-    configurações extras do usuário, adicione-as aqui. Exemplo:
-    <div class="form-group">
-      <label for="nome_empreendimento"
-        >Nome do Empreendimento (para cabeçalho):</label
-      >
-      <input
-        type="text"
-        id="nome_empreendimento"
-        name="nome_empreendimento"
-        placeholder="Ex: Dona Olivia Ciacci Residencial"
-      />
-    </div>
-    <div class="form-group">
-      <label for="numero_etapa">Número da Etapa (para cabeçalho):</label>
-      <input
-        type="number"
-        id="numero_etapa"
-        name="numero_etapa"
-        value="1"
-        min="1"
-      />
-    </div>
-    Lembre-se de ler esses valores em app.py (request.form.get(...)) e passá-los
-    para a função de processamento, se necessário. --- Fim da Seção Opcional ---
-    #}
-
-    <div style="text-align: center; margin-top: 30px">
-      <button type="submit" class="button-link">
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          width="18"
-          height="18"
-          fill="currentColor"
-          class="bi bi-file-earmark-arrow-down-fill"
-          viewBox="0 0 16 16"
-          style="vertical-align: middle; margin-right: 8px"
+      <div class="mb-3">
+        {# Usa mb-3 do Bootstrap para espaçamento #}
+        <label for="arquivo_entrada" class="form-label"
+          ><strong>Selecione o Arquivo (.xlsx, .xls, .csv):</strong></label
         >
-          <path
-            d="M9.293 0H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V4.707A1 1 0 0 0 13.707 4L10 .293A1 1 0 0 0 9.293 0M9.5 3.5v-2l3 3h-2a1 1 0 0 1-1-1m-1 4v3.793l1.146-1.147a.5.5 0 0 1 .708.708l-2 2a.5.5 0 0 1-.708 0l-2-2a.5.5 0 0 1 .708-.708L7.5 11.293V7.5a.5.5 0 0 1 1 0"
-          />
-        </svg>
-        Processar e Baixar Planilha Formatada
-      </button>
-    </div>
-  </form>
-</div>
+        <input
+          type="file"
+          class="form-control"
+          {#
+          Adiciona
+          classe
+          form-control
+          #}
+          id="arquivo_entrada"
+          name="arquivo_entrada"
+          accept=".xlsx, .xls, .csv"
+          {#
+          ACEITA
+          CSV
+          #}
+          required
+        />
+      </div>
 
-{% endblock %} {% block scripts %} {# Adicione aqui JS específico, se necessário
-(ex: mostrar nome do arquivo selecionado) #}
+      <!-- Opções que aparecem APENAS se um CSV for selecionado -->
+      <div id="csv-options" class="mb-3" style="display: none">
+        {# Adicionado mb-3 #}
+        <h5 class="mb-3">Opções para Arquivo CSV</h5>
+        <div class="row g-3">
+          <div class="col-md-4">
+            <label for="csv_separator" class="form-label"
+              >Separador Colunas:</label
+            >
+            <select
+              class="form-select form-select-sm"
+              id="csv_separator"
+              name="csv_separator"
+            >
+              <option value=";" selected>Ponto e vírgula (;)</option>
+              <option value=",">Vírgula (,)</option>
+              <option value="\t">Tabulação (Tab)</option>
+              <option value="|">Pipe (|)</option>
+            </select>
+          </div>
+          <div class="col-md-4">
+            <label for="csv_decimal" class="form-label"
+              >Separador Decimal:</label
+            >
+            <select
+              class="form-select form-select-sm"
+              id="csv_decimal"
+              name="csv_decimal"
+            >
+              <option value="," selected>Vírgula (,)</option>
+              <option value=".">Ponto (.)</option>
+            </select>
+          </div>
+          <div class="col-md-4">
+            <label for="csv_encoding" class="form-label">Codificação:</label>
+            <select
+              class="form-select form-select-sm"
+              id="csv_encoding"
+              name="csv_encoding"
+            >
+              <option value="utf-8" selected>UTF-8</option>
+              <option value="latin-1">Latin-1 (ISO-8859-1)</option>
+              <option value="utf-8-sig">UTF-8 c/ BOM</option>
+              <option value="cp1252">Windows-1252</option>
+              {# Outra comum #}
+            </select>
+          </div>
+        </div>
+      </div>
+      <!-- Fim das Opções CSV -->
+
+      <div style="text-align: center; margin-top: 30px">
+        <button type="submit" class="btn btn-primary btn-lg">
+          {# Usa classes de botão Bootstrap #}
+          <i class="fas fa-cogs me-2"></i> {# Ícone FontAwesome (se usar) #}
+          Enviar Arquivo e Mapear Etapas
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %} {% block scripts %} {{ super() }} {# Inclui scripts do base se
+houver #}
 <script>
   document.addEventListener("DOMContentLoaded", function () {
     const fileInput = document.getElementById("arquivo_entrada");
-    if (fileInput) {
+    const csvOptionsDiv = document.getElementById("csv-options");
+
+    if (fileInput && csvOptionsDiv) {
+      // Verifica se ambos elementos existem
       fileInput.addEventListener("change", function () {
-        if (this.files && this.files.length > 0) {
-          console.log("Arquivo selecionado:", this.files[0].name);
-          // Poderia exibir o nome do arquivo em algum lugar na interface, se desejado
+        const filename = fileInput.value.toLowerCase();
+        if (filename.endsWith(".csv")) {
+          csvOptionsDiv.style.display = "block"; // Mostra opções
+          // Você pode decidir tornar os selects obrigatórios ou não aqui
+          // csvOptionsDiv.querySelectorAll('select').forEach(sel => sel.required = true);
+          console.log("CSV selecionado, mostrando opções.");
+        } else {
+          csvOptionsDiv.style.display = "none"; // Esconde opções
+          // csvOptionsDiv.querySelectorAll('select').forEach(sel => sel.required = false);
+          console.log("Arquivo não CSV selecionado, escondendo opções.");
         }
       });
+    } else {
+      console.error(
+        "Elemento de input de arquivo ou container de opções CSV não encontrado."
+      );
     }
   });
 </script>

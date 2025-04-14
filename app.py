@@ -779,92 +779,129 @@ def formatador_lote_tool():
 
     else: # GET
         return render_template('formatador_lote.html', active_page='formatador_lote')
+
+# Função auxiliar (exemplo, adapte se estiver em utils.py)
+def allowed_file(filename):
+     ALLOWED_EXTENSIONS = {'xlsx', 'xls', 'csv'}
+     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
     
 # === ROTA PARA FORMATADOR TABELA DE PREÇOS ===
 @app.route('/formatador-tabela-precos', methods=['GET', 'POST'])
 def formatador_tabela_precos_upload():
     tool_prefix = 'tab_precos_'
     session_key = f'{tool_prefix}info'
-    print("DEBUG: Entrando em formatador_tabela_precos_upload, Método:", request.method)
+    print(f"DEBUG: Entrando em {url_for('formatador_tabela_precos_upload')}, Método: {request.method}")
+
+# Dentro da função formatador_tabela_precos_upload em app.py
 
     if request.method == 'POST':
         print("DEBUG: Processando POST")
-        # --- Upload e Leitura Inicial ---
+        # --- Validações Iniciais ---
         if 'arquivo_entrada' not in request.files:
             flash('Nenhum arquivo selecionado!', 'error')
+            print("DEBUG: Saindo - Nenhum arquivo_entrada")
             return redirect(url_for('formatador_tabela_precos_upload'))
         file = request.files['arquivo_entrada']
         if file.filename == '':
             flash('Nenhum arquivo selecionado!', 'error')
-            print("DEBUG: Retornando redirect - sem arquivo_entrada")
+            print("DEBUG: Saindo - Nome de arquivo vazio")
             return redirect(url_for('formatador_tabela_precos_upload'))
-        if not file or not allowed_file(file.filename): # Reutiliza a função global
-            flash('Tipo de arquivo inválido. Use .xlsx ou .xls.', 'error')
+        # Verifica extensão
+        file_ext = '.' in file.filename and file.filename.rsplit('.', 1)[1].lower()
+        if not file or file_ext not in {'xlsx', 'xls', 'csv'}:
+            flash('Tipo de arquivo inválido. Use .xlsx, .xls ou .csv.', 'error')
+            print(f"DEBUG: Saindo - Extensão inválida: {file_ext}")
             return redirect(url_for('formatador_tabela_precos_upload'))
 
         filename = secure_filename(f"{tool_prefix}{file.filename}")
         temp_filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-
+        is_csv = file_ext == 'csv'
+        
+        # <<< INÍCIO DAS MODIFICAÇÕES PARA LEITURA CONDICIONAL >>>
+        # --- Bloco Try/Except para Leitura e Processamento Inicial ---
+        df_check = None
         try:
             file.save(temp_filepath)
             print(f"(Tabela Preços Upload) Arquivo temporário salvo: {temp_filepath}")
 
-            # --- Ler o Excel para encontrar Blocos ---
-            NUMERO_DA_LINHA_DO_CABECALHO_NO_EXCEL = 3 # Manter consistente
-            linhas_para_pular = NUMERO_DA_LINHA_DO_CABECALHO_NO_EXCEL - 1
-            df_check = pd.read_excel(temp_filepath, engine='openpyxl', skiprows=linhas_para_pular, header=0, dtype=str).fillna('')
+            # --- Obter parâmetros CSV do formulário ---
+            csv_sep = request.form.get('csv_separator', ';')
+            csv_decimal = request.form.get('csv_decimal', ',')
+            csv_encoding = request.form.get('csv_encoding', 'utf-8')
+
+            # --- Leitura Condicional ---
+            print(f"DEBUG: Tentando ler {'CSV' if is_csv else 'Excel'}")
+            if is_csv:
+                print(f"DEBUG: CSV Params - Sep: '{csv_sep}', Decimal: '{csv_decimal}', Encoding: '{csv_encoding}'")
+                try:
+                    df_check = pd.read_csv(temp_filepath, sep=csv_sep, decimal=csv_decimal, encoding=csv_encoding, header=0, dtype=str, skipinitialspace=True)
+                except UnicodeDecodeError:
+                    print(f"DEBUG: Falha com {csv_encoding}, tentando latin-1...")
+                    try:
+                        df_check = pd.read_csv(temp_filepath, sep=csv_sep, decimal=csv_decimal, encoding='latin-1', header=0, dtype=str, skipinitialspace=True)
+                        print("DEBUG: Leitura com latin-1 ok.")
+                    except Exception as e_fallback:
+                         raise ValueError(f"Não foi possível ler o CSV (Encoding/Separador/Decimal?). Erro: {e_fallback}")
+                except Exception as e_csv:
+                    raise ValueError(f"Erro ao ler CSV: {e_csv}")
+            else: # Excel
+                print("DEBUG: Lendo Excel...")
+                NUMERO_DA_LINHA_DO_CABECALHO_NO_EXCEL = 3
+                linhas_para_pular = NUMERO_DA_LINHA_DO_CABECALHO_NO_EXCEL - 1
+                df_check = pd.read_excel(temp_filepath, engine='openpyxl', skiprows=linhas_para_pular, header=0, dtype=str)
+
+            df_check = df_check.fillna('')
+            df_check.columns = df_check.columns.str.strip()
+
+            # --- Lógica para encontrar blocos ---
             if df_check.empty:
-                 raise ValueError("Planilha vazia ou sem dados após cabeçalho.")
+                 raise ValueError("Arquivo vazio ou sem dados após cabeçalho.")
 
-            # Encontrar coluna de Bloco/Quadra (reusa lógica do formatador)
+            # Certifique-se que find_column_flexible e extract_block_number_safe estão disponíveis/importadas
             bloco_col_name = find_column_flexible(df_check.columns, ['bloco', 'blk', 'quadra'], 'BLOCO', required=True)
-
-            # Obter valores únicos e preenchidos (ffill)
             unique_blocks_raw = df_check[bloco_col_name].replace('', np.nan).ffill().dropna().unique().tolist()
-
             if not unique_blocks_raw:
-                 raise ValueError("Nenhum valor de Bloco/Quadra encontrado na coluna correspondente.")
-
-            # Limpa e garante que sejam strings
+                 raise ValueError("Nenhum valor de Bloco/Quadra encontrado.")
             unique_blocks = sorted(list(set(str(b).strip() for b in unique_blocks_raw if str(b).strip())),
-                                   key=lambda b: extract_block_number_safe(b) if extract_block_number_safe(b) is not None else float('inf')) # Ordena numericamente se possível
+                                   key=lambda b: extract_block_number_safe(b) if extract_block_number_safe(b) is not None else float('inf'))
 
+            print(f"(Tabela Preços Upload) Blocos únicos: {unique_blocks}")
 
-            print(f"(Tabela Preços Upload) Blocos únicos encontrados: {unique_blocks}")
-
-            # Armazena na sessão e redireciona para o mapeamento
-            session[session_key] = {'filename': filename, 'unique_blocks': unique_blocks}
-            print("DEBUG: Retornando redirect para map_etapas (try bem-sucedido)")
+            # --- Armazena na sessão e redireciona ---
+            session_data = {'filename': filename, 'unique_blocks': unique_blocks}
+            session[session_key] = session_data
+            print("DEBUG: Saindo - Sucesso POST, redirecionando para map_etapas")
             return redirect(url_for('formatador_tabela_precos_map_etapas'))
 
         except ValueError as ve:
-             flash(f"Erro ao ler arquivo: {ve}", 'error')
-             print(f"(Tabela Preços Upload) Erro leitura/validação: {ve}")
-             if os.path.exists(temp_filepath): os.remove(temp_filepath) # Limpa temp
-             session.pop(session_key, None) # Limpa sessão
-             print("DEBUG: Retornando redirect após ValueError")
+             flash(f"Erro ao ler/processar arquivo: {ve}", 'error')
+             print(f"(Tabela Preços Upload) Erro (ValueError): {ve}")
+             # Limpeza
+             if os.path.exists(temp_filepath): os.remove(temp_filepath)
+             session.pop(session_key, None)
+             print("DEBUG: Saindo - Erro (ValueError), redirecionando para upload")
              return redirect(url_for('formatador_tabela_precos_upload'))
         except Exception as e:
-            flash(f"Erro inesperado ao ler arquivo: {e}", 'error')
-            print(f"(Tabela Preços Upload) Erro inesperado: {e}")
+            flash(f"Erro inesperado: {e}", 'error')
+            print(f"(Tabela Preços Upload) Erro Inesperado (Exception): {e}")
             traceback.print_exc()
-            if os.path.exists(temp_filepath): os.remove(temp_filepath)
+            # Limpeza
+            if 'temp_filepath' in locals() and os.path.exists(temp_filepath): os.remove(temp_filepath)
             session.pop(session_key, None)
-            print("DEBUG: Retornando redirect após Exception geral")
+            print("DEBUG: Saindo - Erro (Exception), redirecionando para upload")
             return redirect(url_for('formatador_tabela_precos_upload'))
-        
-        print("!!!!! ERRO: Chegou ao fim do bloco POST sem return !!!!!")
+        # Não deve chegar aqui no POST
+        # print("!!!!! ALERTA: Fim do bloco POST sem return alcançado !!!!!")
 
     else: # Método GET
-        print("DEBUG: Processando GET") # Adicione isto
-        # ... (lógica do GET) ...
-    print("DEBUG: Retornando render_template para upload inicial") # Adicione isto
-    return render_template(
-        'formatador_tabela_precos.html',
-        active_page='formatador_tabela_precos'
-)
-
-    print("!!!!! ERRO: Chegou ao fim da função SEM return !!!!!")
+        print("DEBUG: Processando GET")
+        print(f"DEBUG: Limpando sessão '{session_key}' (GET)")
+        session.pop(session_key, None) # Limpa sessão ao carregar a página inicial
+        print("DEBUG: Saindo - Renderizando template inicial (GET)")
+        return render_template(
+            'formatador_tabela_precos.html',
+            active_page='formatador_tabela_precos'
+        )
         
 # --- NOVA ROTA para Mapeamento de Blocos e Etapas ---
 @app.route('/formatador-tabela-precos/map-etapas', methods=['GET', 'POST'])
