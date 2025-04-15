@@ -9,6 +9,25 @@ import csv
 
 # --- Funções Auxiliares para Busca de Coluna (Robustas) ---
 
+def parse_numeric(value):
+    """Limpa string e tenta converter para float. Retorna NaN em caso de erro."""
+    if pd.isna(value) or value == '':
+        return pd.NA # Usar pd.NA que é mais consistente que np.nan para nullable int/float
+    s_val = str(value).strip()
+    # Remove letras exceto E (para notação científica), R, $ e espaços
+    # Preserva dígitos, ponto, vírgula e sinal negativo
+    s_val = re.sub(r'[a-df-zA-DF-Z R$]', '', s_val)
+    # Troca vírgula decimal por ponto
+    if ',' in s_val and '.' in s_val:
+        s_val = s_val.replace('.', '').replace(',', '.')
+    elif ',' in s_val:
+        s_val = s_val.replace(',', '.')
+    try:
+        return float(s_val)
+    except (ValueError, TypeError):
+        print(f"Aviso parse_numeric: Não converteu '{value}' para número.")
+        return pd.NA # Retorna Nulo do Pandas em caso de erro
+
 def normalize_text_for_match(text):
     """Normaliza texto para busca: minúsculo, sem acentos, sem não-alfanuméricos."""
     if not isinstance(text, str): text = str(text)
@@ -117,13 +136,37 @@ def formatar_nome_unidade(row):
     return "UNIDADE_ERRO"
 
 def format_brl(value):
-    """Converte valor numérico ou string para formato moeda BRL (R$ X.XXX,XX). Retorna '' se inválido."""
+    """Converte valor numérico ou string para formato moeda BRL (R$ #.###,##) de forma manual."""
     if pd.isna(value) or value == '': return ''
     s_val = str(value).strip()
     if re.search(r'[a-gi-qs-zA-GI-QS-Z]', s_val): print(f"Aviso format_brl: Valor '{value}' contém letras inesperadas. Retornando vazio."); return ''
-    s_val = s_val.replace('R$', '').replace('.', '').strip(); s_val = s_val.replace(',', '.')
-    try: num = float(s_val); formatted_value = f"{num:_.2f}".replace(".", ",").replace("_", "."); return f"R$ {formatted_value}"
-    except (ValueError, TypeError): print(f"Aviso format_brl: Não converteu '{value}' para número. Retornando vazio."); return ''
+    s_val = re.sub(r'[^\d,.-]', '', s_val) # Remove tudo exceto dígitos, vírgula, ponto, sinal
+    if ',' in s_val and '.' in s_val: s_val = s_val.replace('.', '').replace(',', '.')
+    elif ',' in s_val: s_val = s_val.replace(',', '.')
+
+    try:
+        num = float(s_val)
+        # --- Formatação Manual Explícita ---
+        valor_com_decimal = f"{num:.2f}".replace('.', ',')
+        partes = valor_com_decimal.split(',')
+        parte_inteira = partes[0]
+        # Lida com números negativos corretamente
+        sinal = ""
+        if parte_inteira.startswith('-'):
+            sinal = "-"
+            parte_inteira = parte_inteira[1:] # Remove sinal para formatar
+
+        parte_decimal = partes[1]
+        parte_inteira_com_milhar = ""
+        n_digitos = len(parte_inteira)
+        for i, digito in enumerate(parte_inteira):
+            parte_inteira_com_milhar += digito
+            if (n_digitos - 1 - i) > 0 and (n_digitos - 1 - i) % 3 == 0: # Adiciona ponto a cada 3 digitos da dir p/ esq (exceto no inicio)
+                parte_inteira_com_milhar += "."
+        return f"R$ {sinal}{parte_inteira_com_milhar},{parte_decimal}"
+        # --- Fim da Formatação Manual ---
+    except (ValueError, TypeError):
+        print(f"Aviso format_brl: Não converteu '{value}' para número após limpeza. Retornando vazio."); return ''
 
 def format_area(value):
     """Limpa valor de área, converte para float e formata com vírgula decimal."""
@@ -285,10 +328,147 @@ def processar_preco_lote_avista(input_file_object):
     except Exception as e: print(f"(Preço Lote Avista) ERRO INESPERADO: {e}"); traceback.print_exc(); raise RuntimeError(f"Erro inesperado (Lote Avista): {e}") from e
 
 # --- Função Placeholder para Tabela Lote Parcelado ---
-def processar_preco_lote_parcelado(input_filepath):
-    """Lê Excel lote parcelado e retorna BytesIO Excel (Placeholder)."""
-    print(f"(Preço Lote Parcelado) Iniciando processamento (PLACEHOLDER): {input_filepath}")
-    try: df_input = pd.read_excel(input_filepath, engine='openpyxl'); df_output = df_input.copy(); df_output['Processado'] = 'Sim - Lote Parcelado (Placeholder)'; output = io.BytesIO();
-    except Exception as e: raise RuntimeError(f"Erro placeholder Lote Parcelado: {e}")
-    with pd.ExcelWriter(output, engine='openpyxl') as writer: df_output.to_excel(writer, sheet_name='Precos_Lote_Parcelado', index=False)
-    output.seek(0); print("(Preço Lote Parcelado) Processamento (placeholder) concluído."); return output
+def processar_preco_lote_parcelado(input_file_object, num_meses, juros_anual_perc, num_anos_parcelas): # <<< Assinatura Atualizada
+    """
+    Lê Excel lote parcelado, calcula parcelas até o ano especificado pelo usuário,
+    filtra e retorna StringIO CSV.
+    """
+    print(f"(Preço Lote Parcelado) Iniciando. Meses: {num_meses}, Juros: {juros_anual_perc}%, Anos Parcelas: {num_anos_parcelas}")
+    try:
+        # Validação inicial dos parâmetros numéricos
+        if num_meses <= 0:
+            raise ValueError("Quantidade de meses deve ser maior que zero.")
+        if juros_anual_perc < 0:
+            raise ValueError("Porcentagem de juros anual não pode ser negativa.")
+        if num_anos_parcelas <= 0:
+            raise ValueError("Número de anos das parcelas deve ser maior que zero.")
+        # Converte juros para multiplicador (ex: 10% -> 1.10)
+        juros_multiplier = 1.0 + (juros_anual_perc / 100.0)
+        print(f"Multiplicador de juros anual calculado: {juros_multiplier:.4f}")
+
+        # 1. Leitura do Excel (leitura revisada para merged cells)
+        linhas_para_ignorar = 2
+        try:
+            df_raw = pd.read_excel(input_file_object, engine='openpyxl', header=None, dtype=str)
+            if df_raw.empty: raise ValueError("Arquivo Excel parece estar vazio.")
+            print(f"(Preço Lote Parcelado) Lidas {len(df_raw)} linhas brutas.")
+        except Exception as e_read:
+            raise ValueError(f"Falha ao ler o stream/objeto Excel inicial (Lote Parcelado).") from e_read
+
+        # 2. Encontrar Linha do Cabeçalho e Coluna Quadra
+        header_row_index = -1
+        possible_headers = ['lote', 'tipo', 'area', 'valor', 'entrada'] # Keywords para header
+        for idx, row in df_raw.head(10).iterrows():
+            row_values_norm = [normalize_text_for_match(str(v)) for v in row.values if pd.notna(v)]
+            if sum(h in row_values_norm for h in possible_headers) >= 3: header_row_index = idx; break
+        if header_row_index == -1: raise ValueError("Não foi possível encontrar a linha do cabeçalho.")
+        print(f"Cabeçalho encontrado índice: {header_row_index}")
+
+        quadra_col_index = -1; keyword_quadra = normalize_text_for_match('quadra')
+        search_rows = [header_row_index] if header_row_index == 0 else [header_row_index-1, header_row_index]
+        for r_idx in search_rows:
+             if r_idx < 0: continue
+             for c_idx, val in df_raw.iloc[r_idx].items():
+                 if pd.notna(val) and keyword_quadra in normalize_text_for_match(str(val)): quadra_col_index = c_idx; break
+             if quadra_col_index != -1: break
+        if quadra_col_index == -1: raise ValueError("Não foi possível encontrar a coluna 'QUADRA'.")
+        print(f"Coluna Quadra índice: {quadra_col_index}")
+
+        # 3. Aplicar ffill na Quadra nos Dados Brutos
+        print(f"Aplicando ffill na coluna bruta índice {quadra_col_index}")
+        df_raw[quadra_col_index] = df_raw[quadra_col_index].ffill()
+
+        # 4. Criar DataFrame Limpo (df_input)
+        new_columns = df_raw.iloc[header_row_index].astype(str).str.strip(); df_input = df_raw.iloc[header_row_index + 1:].copy(); df_input.columns = new_columns; df_input = df_input.reset_index(drop=True)
+        print(f"Colunas limpas: {df_input.columns.tolist()}")
+
+        # 5. Identificar Colunas Essenciais no DF Limpo
+        print("--- Buscando Colunas (Lote Parcelado) ---")
+        col_quadra = new_columns[quadra_col_index] # Pega o nome da coluna Quadra
+        col_lote = find_column_flexible(df_input.columns, ['lote', 'lt', 'unidade'], 'LOTE', required=True)
+        # Busca coluna de VALOR (total) - pode ser só "Valor"
+        col_valor_total = find_column_flexible(df_input.columns, ['valor'], 'VALOR (Total)', required=True)
+        col_entrada = find_column_flexible(df_input.columns, ['entrada', 'sinal'], 'ENTRADA', required=True)
+        print("--- Fim da Busca ---")
+
+        # 6. Remover Linhas Inválidas (sem Lote)
+        print(f"Linhas antes dropna(lote): {len(df_input)}")
+        df_input = df_input.dropna(subset=[col_lote]).reset_index(drop=True)
+        print(f"Linhas após dropna(lote): {len(df_input)}")
+        if df_input.empty: raise ValueError("Nenhuma linha com Lote encontrada.")
+        # Preenche NaNs restantes na Quadra (se houver)
+        if df_input[col_quadra].isnull().any():
+            print(f"AVISO: Preenchendo NaNs restantes em '{col_quadra}'")
+            df_input[col_quadra] = df_input[col_quadra].fillna('QUADRA_DESCONHECIDA')
+
+        # 7. Construir DataFrame de Saída e Calcular Parcelas
+        df_output = pd.DataFrame(index=df_input.index)
+
+        # 7.1 Colunas Fixas/Formatadas
+        df_output['ETAPA'] = 'ETAPA 01'
+        quadra_num_extraido = df_input[col_quadra].fillna('').astype(str).str.extract(r'(\d+)', expand=False)
+        quadra_int = pd.to_numeric(quadra_num_extraido, errors='coerce').fillna(0).astype(int); quadra_formatada_num = quadra_int.apply(lambda x: f"{x:02d}")
+        df_output['BLOCO'] = quadra_formatada_num.apply(lambda x: f'="QUADRA {x}"')
+        lote_formatado_num = df_input[col_lote].fillna('').astype(str).str.extract(r'(\d+)', expand=False).fillna('0').astype(int).apply(lambda x: f"{x:02d}")
+        df_output['UNIDADE'] = "QD" + quadra_formatada_num + " - LOTE " + lote_formatado_num
+        df_output['VALOR DO IMOVEL'] = df_input[col_valor_total].apply(format_brl) # Usa format_brl corrigido
+        df_output['SINAL 1'] = df_input[col_entrada].apply(format_brl) # Usa format_brl corrigido
+
+        # 7.2 Cálculos de Parcelas
+        # Obter valores NUMÉRICOS para cálculo
+        valor_numeric = df_input[col_valor_total].apply(parse_numeric)
+        entrada_numeric = df_input[col_entrada].apply(parse_numeric)
+        # Tratar casos onde valor ou entrada não puderam ser convertidos (pd.NA)
+        valor_numeric = valor_numeric.fillna(0)
+        entrada_numeric = entrada_numeric.fillna(0)
+        print("Valores numéricos para cálculo (primeiras linhas):")
+        print(pd.DataFrame({'Valor': valor_numeric, 'Entrada': entrada_numeric}).head().to_string())
+
+        # Calcular Mensal Ano 01
+        saldo_devedor = valor_numeric - entrada_numeric
+        # Evitar divisão por zero
+        mensal_ano_01_numeric = (saldo_devedor / num_meses if num_meses != 0 else 0).round(2)
+        df_output['MENSAL ANO 01'] = mensal_ano_01_numeric.apply(format_brl) # Usa format_brl
+
+        # --- LOOP MODIFICADO para usar num_anos_parcelas ---
+        mensal_anterior_numeric = mensal_ano_01_numeric
+        print(f"Calculando parcelas mensais de ano 02 até {num_anos_parcelas}...")
+        # O loop agora vai de 2 até o número de anos informado + 1 (para incluir o último ano)
+        for i in range(2, num_anos_parcelas + 1):
+            mensal_atual_numeric = (mensal_anterior_numeric * juros_multiplier).round(2)
+            col_name = f"MENSAL ANO {i:02d}" # Cria nome da coluna ex: MENSAL ANO 02
+            df_output[col_name] = mensal_atual_numeric.apply(format_brl) # Usa format_brl
+            mensal_anterior_numeric = mensal_atual_numeric # Atualiza para o próximo cálculo
+        # --- FIM LOOP MODIFICADO ---
+
+        # 8. FILTRAGEM FINAL: Remover linhas com Lote '00' E VALOR TOTAL vazio/inválido
+        print(f"Linhas antes da filtragem final: {len(df_output)}")
+        is_lote_00 = lote_formatado_num == "00"
+        # Checa se VALOR DO IMOVEL (formatado) é vazio
+        is_valor_total_vazio = df_output['VALOR DO IMOVEL'] == ''
+        condicao_excluir = is_lote_00 & is_valor_total_vazio
+        df_output_filtrado = df_output[~condicao_excluir].copy()
+        print(f"Linhas após a filtragem final: {len(df_output_filtrado)}")
+
+        # 9. Selecionar e Reordenar Colunas Finais (MODIFICADO)
+        # Gera a lista de colunas MENSAL ANO dinamicamente até o ano especificado
+        colunas_mensais = [f'MENSAL ANO {i:02d}' for i in range(1, num_anos_parcelas + 1)]
+        colunas_finais_desejadas = [
+            'ETAPA', 'BLOCO', 'UNIDADE', 'VALOR DO IMOVEL', 'SINAL 1'
+        ] + colunas_mensais
+
+        # Garante que todas as colunas calculadas realmente existam no df antes de selecionar
+        colunas_existentes = [col for col in colunas_finais_desejadas if col in df_output_filtrado.columns]
+        df_output_final = df_output_filtrado[colunas_existentes]
+        print(f"Colunas finais selecionadas: {df_output_final.columns.tolist()}")
+
+        # 10. Gerar CSV em memória
+        output_csv = io.StringIO()
+        df_output_final.to_csv(output_csv, sep=';', encoding='utf-8-sig', index=False, decimal=',', quoting=csv.QUOTE_MINIMAL)
+        output_csv.seek(0)
+
+        print("(Preço Lote Parcelado) Processamento concluído. CSV gerado.")
+        return output_csv # Retorna StringIO para a rota tratar
+
+    except ValueError as ve: print(f"(Preço Lote Parcelado) ERRO VALIDAÇÃO: {ve}"); traceback.print_exc(); raise ve
+    except Exception as e: print(f"(Preço Lote Parcelado) ERRO INESPERADO: {e}"); traceback.print_exc(); raise RuntimeError(f"Erro inesperado (Lote Parc): {e}") from e

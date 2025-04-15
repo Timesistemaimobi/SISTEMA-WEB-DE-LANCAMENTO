@@ -1221,14 +1221,31 @@ def importacao_preco_lote_avista_tool():
 def importacao_preco_lote_parcelado_tool():
     tool_prefix = 'preco_lote_parc_'
     temp_filepath = None
-    output_stream = None
+    output_bytes_stream = None
 
     if request.method == 'POST':
+        # Validação básica do arquivo (igual)
         if 'arquivo_entrada' not in request.files: flash('Nenhum arquivo!', 'error'); return redirect(url_for('importacao_preco_lote_parcelado_tool'))
         file = request.files['arquivo_entrada']
         if file.filename == '': flash('Nenhum arquivo!', 'error'); return redirect(url_for('importacao_preco_lote_parcelado_tool'))
         if not file or not allowed_file(file.filename): flash(f'Tipo inválido. Permitidos: {", ".join(ALLOWED_EXTENSIONS)}', 'error'); return redirect(url_for('importacao_preco_lote_parcelado_tool'))
 
+        # Obter e validar parâmetros do formulário
+        try:
+            quantidade_meses = int(request.form.get('quantidade_meses', 0))
+            juros_anual_perc = float(request.form.get('juros_anual_perc', -1.0).replace(',', '.'))
+            num_anos_parcelas = int(request.form.get('num_anos_parcelas', 0)) # <<< NOVO PARÂMETRO
+
+            # Validações
+            if quantidade_meses <= 0: raise ValueError('Quantidade de meses inválida.')
+            if juros_anual_perc < 0: raise ValueError('Porcentagem de juros anual inválida.')
+            if num_anos_parcelas <= 0: raise ValueError('Número de anos das parcelas inválido.') # <<< NOVA VALIDAÇÃO
+
+        except (ValueError, TypeError) as val_err:
+             flash(f'Valores inválidos nos parâmetros: {val_err}', 'error')
+             return redirect(url_for('importacao_preco_lote_parcelado_tool'))
+
+        # Salvar arquivo temporário
         filename = secure_filename(f"{tool_prefix}{file.filename}")
         temp_filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
 
@@ -1236,23 +1253,54 @@ def importacao_preco_lote_parcelado_tool():
             os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
             file.save(temp_filepath)
             print(f"(Preço Lote Parc Rota) Arquivo salvo: {temp_filepath}")
-            output_stream = processar_preco_lote_parcelado(temp_filepath) # Chama a função específica
+
+            # Ler conteúdo em BytesIO
+            file_content_bytesio = None
+            try:
+                with open(temp_filepath, 'rb') as f: file_content = f.read()
+                file_content_bytesio = io.BytesIO(file_content)
+                print("(Preço Lote Parc Rota) Conteúdo lido para BytesIO.")
+            except Exception as read_err:
+                 raise ValueError("Erro ao ler o arquivo temporário.") from read_err
+
+            # Chama a função específica passando objeto e TODOS os parâmetros
+            output_csv_stream = processar_preco_lote_parcelado(
+                file_content_bytesio,
+                quantidade_meses,
+                juros_anual_perc,
+                num_anos_parcelas # <<< PASSA NOVO PARÂMETRO
+            )
+
+            # Converte StringIO para BytesIO
+            output_bytes_stream = io.BytesIO(output_csv_stream.getvalue().encode('utf-8-sig'))
+            output_csv_stream.close()
+
+            # Enviar arquivo CSV
             input_basename = file.filename.rsplit('.', 1)[0]
-            output_filename = f"{input_basename}_PREC_LOTE_PARC_PROCESSADO.xlsx"
+            output_filename = f"{input_basename}_PREC_LOTE_PARC_{num_anos_parcelas}anos_PROCESSADO.csv" # Nome dinâmico
             print(f"(Preço Lote Parc Rota) Enviando: {output_filename}")
-            return send_file(output_stream, mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', as_attachment=True, download_name=output_filename)
+            return send_file(output_bytes_stream, mimetype='text/csv', as_attachment=True, download_name=output_filename)
+
+        except ValueError as ve:
+            flash(f"Erro de Validação (Lote Parcelado): {ve}", 'error')
+            print(f"(Preço Lote Parc Rota) Erro Validação: {ve}")
+            return redirect(url_for('importacao_preco_lote_parcelado_tool'))
         except Exception as e:
-            flash(f"Erro ao processar Tabela Lote Parcelado: {e}", 'error'); print(f"(Preço Lote Parc Rota) Erro: {e}"); traceback.print_exc()
-            if output_stream: output_stream.close()
+            flash(f"Erro ao processar Tabela Lote Parcelado: {e}", 'error')
+            print(f"(Preço Lote Parc Rota) Erro: {e}")
+            traceback.print_exc()
+            if output_bytes_stream and not output_bytes_stream.closed: output_bytes_stream.close()
             return redirect(url_for('importacao_preco_lote_parcelado_tool'))
         finally:
              if temp_filepath and os.path.exists(temp_filepath):
-                try: os.remove(temp_filepath); print(f"(Preço Lote Parc Rota - Finally) Temp removido: {temp_filepath}")
+                try: os.remove(temp_filepath); print(f"(Preço Lote Parc Rota - Finally) Temp removido.")
                 except OSError as oe: print(f"(Preço Lote Parc Rota - Finally) Erro remover temp: {oe}")
 
     else: # GET
         active_page = 'importacao_preco_lote_parcelado'
-        return render_template('importacao_preco_lote_parcelado.html', active_page=active_page)
+        return render_template('importacao_preco_lote_parcelado.html',
+                               active_page=active_page,
+                               ALLOWED_EXTENSIONS=ALLOWED_EXTENSIONS)
 
 @app.route('/confirmar-preco-incorporacao', methods=['GET', 'POST'])
 def confirmar_processar_preco_incorporacao():

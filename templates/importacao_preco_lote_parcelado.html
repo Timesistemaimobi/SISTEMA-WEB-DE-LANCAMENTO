@@ -1,12 +1,11 @@
 {# templates/importacao_preco_lote_parcelado.html #} {% extends 'base.html' %}
-{% block title %}Importar Tabela Preço - Lote Parcelado{% endblock %} {# <<<
-MUDE O TÍTULO #} {% block styles %} {{ super() }} {# Você pode adicionar estilos
-específicos aqui se precisar #}
+{% block title %}Importar Tabela Preço - Lote Parcelado{% endblock %} {% block
+styles %} {{ super() }}
 <style>
   .description {
-    background-color: #cfe2ff;
-    color: #084298;
-    border: 1px solid #b6d4fe;
+    background-color: #495057;
+    color: #dee2e6;
+    border: 1px solid #495057;
     padding: 15px;
     border-radius: 6px;
     margin-bottom: 25px;
@@ -14,34 +13,38 @@ específicos aqui se precisar #}
     line-height: 1.5;
   }
   .form-container {
-    max-width: 600px;
+    max-width: 800px; /* Aumentar largura */
     margin: 20px auto;
     padding: 25px;
-    background-color: #fff;
+    background-color: #495057;
     border: 1px solid #dee2e6;
     border-radius: 8px;
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+  }
+  .required-label::after {
+    content: " *";
+    color: #5aae02;
   }
 </style>
 {% endblock %} {% block content %}
 <div class="container mt-4">
   <h1>Importar Tabela de Preço - Lote Parcelado</h1>
-  {# <<< MUDE O TÍTULO #}
 
   <div class="description">
-    {# <<< MUDE A DESCRIÇÃO #}
     <p>
-      <strong>Instruções:</strong> Faça o upload da planilha de preços de Lote
-      Parcelado. A ferramenta irá processá-la e gerar um novo arquivo no formato
-      padrão.
+      <strong>Instruções:</strong> Faça o upload da planilha Excel (.xlsx,
+      .xls). Informe a quantidade total de meses, a taxa de juros anual e até
+      qual ano deseja calcular as parcelas mensais. A ferramenta gerará um novo
+      arquivo <strong>CSV</strong> formatado.
     </p>
     <p>
-      Certifique-se que a planilha contém as colunas [Liste as colunas esperadas
-      para Lote Parcelado aqui].
+      Certifique-se que a planilha contém colunas como <strong>QUADRA</strong>,
+      <strong>LOTE</strong>, <strong>VALOR</strong> (total) e
+      <strong>ENTRADA</strong>.
     </p>
   </div>
 
-  {# Bloco para exibir mensagens flash #} {% with messages =
+  {# Mensagens flash #} {% with messages =
   get_flashed_messages(with_categories=true) %} {% if messages %} {% for
   category, message in messages %}
   <div
@@ -59,20 +62,15 @@ específicos aqui se precisar #}
   {% endfor %} {% endif %} {% endwith %}
 
   <div class="form-container">
-    {# <<< MUDE O url_for PARA A ROTA CORRETA #}
     <form
       method="post"
       enctype="multipart/form-data"
       action="{{ url_for('importacao_preco_lote_parcelado_tool') }}"
     >
       <div class="mb-3">
-        <label for="arquivo_entrada_lote_parc" class="form-label"
-          ><strong
-            >Selecione o Arquivo ({% for ext in ALLOWED_EXTENSIONS %}.{{ ext
-            }}{% if not loop.last %}, {% endif %}{% endfor %}):</strong
-          ></label
+        <label for="arquivo_entrada_lote_parc" class="form-label required-label"
+          ><strong>Selecione o Arquivo</strong></label
         >
-        {# <<< MUDE O ID (opcional) #}
         <input
           type="file"
           class="form-control"
@@ -81,15 +79,67 @@ específicos aqui se precisar #}
           accept="{% for ext in ALLOWED_EXTENSIONS %}.{{ ext }}{% if not loop.last %},{% endif %}{% endfor %}"
           required
         />
-        {# <<< MUDE O TEXTO DE AJUDA #}
-        <div class="form-text">
-          Faça upload da planilha de preços de Lote Parcelado.
-        </div>
       </div>
+
+      {# --- CAMPOS DE PARÂMETROS --- #}
+      <div class="row g-3 mb-3">
+        <div class="col-md-4">
+          {# Ajustado para col-md-4 #}
+          <label for="quantidade_meses" class="form-label required-label"
+            ><strong>Total de Meses</strong></label
+          >
+          <input
+            type="number"
+            class="form-control"
+            id="quantidade_meses"
+            name="quantidade_meses"
+            placeholder="Ex: 180"
+            required
+            min="1"
+          />
+          <div class="form-text">Nº total de parcelas.</div>
+        </div>
+        <div class="col-md-4">
+          {# Ajustado para col-md-4 #}
+          <label for="juros_anual_perc" class="form-label required-label"
+            ><strong>Juros Anual (%)</strong></label
+          >
+          <input
+            type="number"
+            step="0.01"
+            class="form-control"
+            id="juros_anual_perc"
+            name="juros_anual_perc"
+            placeholder="Ex: 9.5"
+            required
+            min="0"
+          />
+          <div class="form-text">Taxa para correção anual.</div>
+        </div>
+        {# --- NOVO CAMPO --- #}
+        <div class="col-md-4">
+          {# Ajustado para col-md-4 #}
+          <label for="num_anos_parcelas" class="form-label required-label"
+            ><strong>Calcular Até Ano Nº</strong></label
+          >
+          <input
+            type="number"
+            class="form-control"
+            id="num_anos_parcelas"
+            name="num_anos_parcelas"
+            placeholder="Ex: 12"
+            required
+            min="1"
+          />
+          <div class="form-text">Gerar colunas MENSAL ANO até este ano.</div>
+        </div>
+        {# --- FIM NOVO CAMPO --- #}
+      </div>
+      {# --- FIM CAMPOS DE PARÂMETROS --- #}
 
       <div style="text-align: center; margin-top: 30px">
         <button type="submit" class="btn btn-primary btn-lg">
-          <i class="fas fa-upload me-2"></i> Importar e Processar
+          <i class="fas fa-calculator me-2"></i> Importar e Calcular Parcelas
         </button>
         <a
           href="{{ url_for('home') }}"
@@ -101,5 +151,4 @@ específicos aqui se precisar #}
     </form>
   </div>
 </div>
-{% endblock %} {% block scripts %} {{ super() }} {# Adicione JS aqui se
-necessário #} {% endblock %}
+{% endblock %} {% block scripts %} {{ super() }} {% endblock %}
