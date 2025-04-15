@@ -1,0 +1,104 @@
+{# templates/importacao_preco_incorporacao.html #} {% extends 'base.html' %} {%
+block title %}Importar Tabela Preço - Incorporação{% endblock %} {% block styles
+%} {{ super() }} {# Você pode adicionar estilos específicos aqui se precisar #}
+<style>
+  .description {
+    background-color: #495057;
+    color: #dee2e6;
+    border: 1px solid #495057;
+    padding: 15px;
+    border-radius: 6px;
+    margin-bottom: 25px;
+    font-size: 0.95em;
+    line-height: 1.5;
+  }
+  .form-container {
+    max-width: 600px;
+    margin: 20px auto;
+    padding: 25px;
+    background-color: #495057;
+    border: 1px solid #dee2e6;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+  }
+</style>
+{% endblock %} {% block content %}
+<div class="container mt-4">
+  <h1>Importar Tabela de Preço - Incorporação</h1>
+
+  <div class="description">
+    <p>
+      <strong>Instruções:</strong> Faça o upload da planilha Excel (.xlsx, .xls)
+      de preços de Incorporação. A ferramenta irá processá-la e gerar um novo
+      arquivo <strong>CSV</strong> no formato padrão para importação.
+    </p>
+    <p>
+      Certifique-se que a planilha contém colunas como <strong>BLOCO</strong>,
+      <strong>APT</strong>, e <strong>VALOR DO IMÓVEL</strong>.
+    </p>
+    {# Simplifiquei a lista #}
+  </div>
+
+  {# Bloco para exibir mensagens flash #} {% with messages =
+  get_flashed_messages(with_categories=true) %} {% if messages %} {% for
+  category, message in messages %}
+  <div
+    class="alert alert-{{ category if category != 'message' else 'info' }} alert-dismissible fade show"
+    role="alert"
+  >
+    {{ message }}
+    <button
+      type="button"
+      class="btn-close"
+      data-bs-dismiss="alert"
+      aria-label="Close"
+    ></button>
+  </div>
+  {% endfor %} {% endif %} {% endwith %}
+
+  <div class="form-container">
+    <form
+      method="post"
+      enctype="multipart/form-data"
+      action="{{ url_for('importacao_preco_incorporacao_tool') }}"
+    >
+      <div class="mb-3">
+        {# Mostra as extensões permitidas dinamicamente #}
+        <label for="arquivo_entrada_incorp" class="form-label"
+          ><strong
+            >Selecione o Arquivo ({% for ext in ALLOWED_EXTENSIONS %}.{{ ext
+            }}{% if not loop.last %}, {% endif %}{% endfor %}):</strong
+          ></label
+        >
+        {# O accept ainda pode listar todos, mas a descrição foca no Excel como
+        entrada principal #}
+        <input
+          type="file"
+          class="form-control"
+          id="arquivo_entrada_incorp"
+          name="arquivo_entrada"
+          accept="{% for ext in ALLOWED_EXTENSIONS %}.{{ ext }}{% if not loop.last %},{% endif %}{% endfor %}"
+          required
+        />
+        <div class="form-text">
+          Faça upload da planilha <strong>Excel</strong> de preços de
+          Incorporação. A saída será um arquivo <strong>.csv</strong>.
+        </div>
+      </div>
+
+      <div style="text-align: center; margin-top: 30px">
+        <button type="submit" class="btn btn-primary btn-lg">
+          <i class="fas fa-upload me-2"></i> Importar e Processar
+        </button>
+        <a
+          href="{{ url_for('home') }}"
+          class="btn btn-secondary btn-lg"
+          style="margin-left: 10px"
+          >Cancelar</a
+        >
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %} {% block scripts %} {{ super() }} {# Adicione JS aqui se
+necessário #} {% endblock %}

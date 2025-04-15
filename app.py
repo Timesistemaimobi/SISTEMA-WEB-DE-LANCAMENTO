@@ -15,6 +15,11 @@ from flask import (
 from werkzeug.utils import secure_filename
 from formatadores.tabela_preco_formatador import find_column_flexible, normalize_text_for_match, extract_block_number_safe
 from formatadores.tabela_preco_formatador import processar_tabela_precos_web
+from formatadores.tabela_preco_importador import (
+    processar_preco_incorporacao,
+    processar_preco_lote_avista,
+    processar_preco_lote_parcelado
+)
 
 
 # --- Constantes ---
@@ -1013,6 +1018,342 @@ def formatador_tabela_precos_map_etapas():
             active_page='formatador_tabela_precos',
             unique_blocks=unique_blocks # Passa a lista para o template renderizar os blocos pendentes
         )
+    
+# --- 1. Tabela Incorporação ---
+@app.route('/importacao-preco-incorporacao', methods=['GET', 'POST'])
+def importacao_preco_incorporacao_tool():
+    tool_prefix = 'preco_incorp_'
+    session_key = f'{tool_prefix}session_data' # Chave única para dados da sessão
+    temp_filepath = None # Para garantir acesso no finally (embora não usado no finally aqui)
+
+    if request.method == 'POST':
+        # 1. Validação básica do arquivo
+        if 'arquivo_entrada' not in request.files:
+            flash('Nenhum arquivo selecionado!', 'error')
+            return redirect(request.url)
+        file = request.files['arquivo_entrada']
+        if file.filename == '':
+            flash('Nenhum arquivo selecionado!', 'error')
+            return redirect(request.url)
+        # Usando sua função global allowed_file e ALLOWED_EXTENSIONS
+        # Certifique-se que ALLOWED_EXTENSIONS inclua 'csv' se for o caso
+        if not file or not allowed_file(file.filename):
+            flash(f'Tipo de arquivo inválido. Permitidos: {", ".join(ALLOWED_EXTENSIONS)}', 'error')
+            return redirect(request.url)
+
+        # 2. Salvar arquivo temporariamente
+        filename = secure_filename(f"{tool_prefix}{file.filename}")
+        temp_filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+        try:
+            os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+            file.save(temp_filepath)
+            print(f"(Preço Incorp Upload) Arquivo salvo: {temp_filepath}")
+
+            # 3. Ler Cabeçalho e Encontrar Colunas de Valor Candidatas
+            linhas_para_ignorar = 2
+            try:
+                # Lê apenas a linha do cabeçalho após pular as iniciais
+                df_header = pd.read_excel(
+                    temp_filepath, engine='openpyxl',
+                    skiprows=linhas_para_ignorar, header=0, nrows=0
+                )
+                df_header.columns = df_header.columns.str.strip()
+                print(f"(Preço Incorp Upload) Colunas lidas para seleção: {df_header.columns.tolist()}")
+            except Exception as e_read:
+                 print(f"(Preço Incorp Upload) ERRO ao ler cabeçalho: {e_read}")
+                 # Limpa arquivo temporário se a leitura falhar
+                 if os.path.exists(temp_filepath): os.remove(temp_filepath)
+                 flash(f"Falha ao ler cabeçalho do arquivo Excel: Verifique se o cabeçalho está na linha {linhas_para_ignorar + 1}.", 'error')
+                 return redirect(request.url)
+
+            # Encontra todas as colunas que contêm "valor" (normalizado)
+            potential_valor_cols = []
+            keyword_norm = normalize_text_for_match("valor") # Normaliza a keyword uma vez
+            for col in df_header.columns:
+                col_norm = normalize_text_for_match(str(col)) # Garante que col é string
+                if keyword_norm in col_norm:
+                    potential_valor_cols.append(col) # Adiciona o nome ORIGINAL da coluna
+
+            print(f"(Preço Incorp Upload) Colunas candidatas para VALOR: {potential_valor_cols}")
+
+            # 4. Validar se encontrou colunas candidatas
+            if not potential_valor_cols:
+                if os.path.exists(temp_filepath): os.remove(temp_filepath) # Limpa
+                flash('Nenhuma coluna contendo "VALOR" foi encontrada no cabeçalho do arquivo (verificar linha 3).', 'error')
+                return redirect(request.url)
+
+            # 5. Armazenar na sessão e redirecionar
+            session_data = {
+                'temp_filepath': temp_filepath,
+                'potential_valor_cols': potential_valor_cols,
+                'original_filename': file.filename # Guarda nome original para mostrar
+            }
+            session[session_key] = session_data
+            print(f"(Preço Incorp Upload) Dados salvos na sessão. Redirecionando para seleção.")
+
+            # *** NÃO HÁ CHAMADA PARA processar_preco_incorporacao AQUI ***
+
+            # Redireciona para a nova rota de seleção/confirmação
+            return redirect(url_for('confirmar_processar_preco_incorporacao'))
+
+        except Exception as e:
+            # Tratamento genérico de erro durante o upload/leitura inicial
+            flash(f"Erro inesperado durante o upload: {e}", 'error')
+            print(f"(Preço Incorp Upload) Erro inesperado: {e}")
+            traceback.print_exc()
+            # Garante limpeza do arquivo temporário em caso de erro
+            if temp_filepath and os.path.exists(temp_filepath):
+                try: os.remove(temp_filepath)
+                except OSError: pass
+            session.pop(session_key, None) # Limpa sessão em caso de erro
+            return redirect(request.url)
+        # O finally para limpeza do arquivo agora está na rota de confirmação
+
+    else: # GET (Mostrar formulário de upload inicial)
+        active_page = 'importacao_preco_incorporacao'
+        session.pop(session_key, None) # Limpa sessão antiga ao carregar a página de upload
+        return render_template('importacao_preco_incorporacao.html',
+                               active_page=active_page,
+                               ALLOWED_EXTENSIONS=ALLOWED_EXTENSIONS)
+
+# --- 2. Tabela Lote à Vista ---
+# Dentro de app.py
+
+# --- 2. Tabela Lote à Vista (ROTA AJUSTADA PARA PASSAR BytesIO) ---
+@app.route('/importacao-preco-lote-avista', methods=['GET', 'POST'])
+def importacao_preco_lote_avista_tool():
+    tool_prefix = 'preco_lote_av_'
+    temp_filepath = None
+    output_bytes_stream = None # Para garantir acesso no finally em caso de erro
+
+    if request.method == 'POST':
+        # 1. Validação do arquivo (igual às outras rotas)
+        if 'arquivo_entrada' not in request.files:
+            flash('Nenhum arquivo selecionado!', 'error')
+            return redirect(url_for('importacao_preco_lote_avista_tool'))
+        file = request.files['arquivo_entrada']
+        if file.filename == '':
+            flash('Nenhum arquivo selecionado!', 'error')
+            return redirect(url_for('importacao_preco_lote_avista_tool'))
+        # Usando sua função global allowed_file e ALLOWED_EXTENSIONS
+        if not file or not allowed_file(file.filename):
+            flash(f'Tipo de arquivo inválido. Permitidos: {", ".join(ALLOWED_EXTENSIONS)}', 'error')
+            return redirect(url_for('importacao_preco_lote_avista_tool'))
+
+        # 2. Salvar arquivo temporariamente
+        filename = secure_filename(f"{tool_prefix}{file.filename}")
+        temp_filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+
+        try:
+            # Garante que a pasta de uploads existe
+            os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+            # Salva o arquivo temporariamente
+            file.save(temp_filepath)
+            print(f"(Preço Lote AV Rota) Arquivo salvo: {temp_filepath}")
+
+            # 3. Ler o conteúdo do arquivo salvo em BytesIO
+            file_content_bytesio = None
+            try:
+                with open(temp_filepath, 'rb') as f: # Abre em modo binário ('rb')
+                    file_content = f.read() # Lê todo o conteúdo binário
+                file_content_bytesio = io.BytesIO(file_content) # Cria o objeto BytesIO em memória
+                print("(Preço Lote AV Rota) Conteúdo do arquivo lido para BytesIO.")
+            except Exception as read_err:
+                 # Se falhar ao ler o arquivo salvo (permissão, disco cheio, etc.)
+                 print(f"(Preço Lote AV Rota) Erro ao ler arquivo temporário '{temp_filepath}': {read_err}")
+                 # Limpa o arquivo temporário se ele foi criado mas não pôde ser lido
+                 if temp_filepath and os.path.exists(temp_filepath):
+                     try: os.remove(temp_filepath)
+                     except OSError: pass
+                 raise ValueError("Erro ao ler o arquivo temporário após salvar.") from read_err
+
+            # 4. Chama a função específica de processamento, passando o objeto BytesIO
+            output_csv_stream = processar_preco_lote_avista(file_content_bytesio) # Passa o objeto, não o path
+
+            # 5. Converte o StringIO retornado pela função para BytesIO para send_file
+            output_bytes_stream = io.BytesIO(output_csv_stream.getvalue().encode('utf-8-sig'))
+            output_csv_stream.close() # Fecha o StringIO intermediário
+
+            # 6. Define o nome do arquivo de saída .csv
+            input_basename = file.filename.rsplit('.', 1)[0]
+            output_filename = f"{input_basename}_PREC_LOTE_AV_PROCESSADO.csv"
+            print(f"(Preço Lote AV Rota) Enviando: {output_filename}")
+
+            # 7. Envia o arquivo CSV para download
+            return send_file(
+                output_bytes_stream,
+                mimetype='text/csv', # Mimetype correto para CSV
+                as_attachment=True,
+                download_name=output_filename
+            )
+        except ValueError as ve: # Captura erros de validação (ex: coluna não encontrada, erro de leitura)
+            flash(f"Erro de Validação (Lote à Vista): {ve}", 'error')
+            print(f"(Preço Lote AV Rota) Erro Validação: {ve}")
+            # Redireciona de volta para a página de upload
+            return redirect(url_for('importacao_preco_lote_avista_tool'))
+        except Exception as e: # Captura outros erros inesperados durante o processamento
+            flash(f"Erro ao processar Tabela Lote à Vista: {e}", 'error')
+            print(f"(Preço Lote AV Rota) Erro Inesperado: {e}")
+            traceback.print_exc()
+            # Tenta fechar o stream de saída se ele foi criado antes do erro
+            if output_bytes_stream and not output_bytes_stream.closed:
+                 try: output_bytes_stream.close()
+                 except Exception: pass
+            # Redireciona de volta para a página de upload
+            return redirect(url_for('importacao_preco_lote_avista_tool'))
+        finally:
+             # 8. Limpeza do arquivo temporário (SEMPRE executa, mesmo com erro)
+             if temp_filepath and os.path.exists(temp_filepath):
+                try:
+                    os.remove(temp_filepath)
+                    print(f"(Preço Lote AV Rota - Finally) Temp removido: {temp_filepath}")
+                except OSError as oe:
+                    print(f"(Preço Lote AV Rota - Finally) Erro remover temp '{temp_filepath}': {oe}")
+
+    else: # GET - Mostrar o formulário de upload
+        active_page = 'importacao_preco_lote_avista'
+        return render_template('importacao_preco_lote_avista.html',
+                               active_page=active_page,
+                               ALLOWED_EXTENSIONS=ALLOWED_EXTENSIONS) # Passa extensões permitidas
+
+# --- 3. Tabela Lote Parcelado ---
+@app.route('/importacao-preco-lote-parcelado', methods=['GET', 'POST'])
+def importacao_preco_lote_parcelado_tool():
+    tool_prefix = 'preco_lote_parc_'
+    temp_filepath = None
+    output_stream = None
+
+    if request.method == 'POST':
+        if 'arquivo_entrada' not in request.files: flash('Nenhum arquivo!', 'error'); return redirect(url_for('importacao_preco_lote_parcelado_tool'))
+        file = request.files['arquivo_entrada']
+        if file.filename == '': flash('Nenhum arquivo!', 'error'); return redirect(url_for('importacao_preco_lote_parcelado_tool'))
+        if not file or not allowed_file(file.filename): flash(f'Tipo inválido. Permitidos: {", ".join(ALLOWED_EXTENSIONS)}', 'error'); return redirect(url_for('importacao_preco_lote_parcelado_tool'))
+
+        filename = secure_filename(f"{tool_prefix}{file.filename}")
+        temp_filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+
+        try:
+            os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+            file.save(temp_filepath)
+            print(f"(Preço Lote Parc Rota) Arquivo salvo: {temp_filepath}")
+            output_stream = processar_preco_lote_parcelado(temp_filepath) # Chama a função específica
+            input_basename = file.filename.rsplit('.', 1)[0]
+            output_filename = f"{input_basename}_PREC_LOTE_PARC_PROCESSADO.xlsx"
+            print(f"(Preço Lote Parc Rota) Enviando: {output_filename}")
+            return send_file(output_stream, mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', as_attachment=True, download_name=output_filename)
+        except Exception as e:
+            flash(f"Erro ao processar Tabela Lote Parcelado: {e}", 'error'); print(f"(Preço Lote Parc Rota) Erro: {e}"); traceback.print_exc()
+            if output_stream: output_stream.close()
+            return redirect(url_for('importacao_preco_lote_parcelado_tool'))
+        finally:
+             if temp_filepath and os.path.exists(temp_filepath):
+                try: os.remove(temp_filepath); print(f"(Preço Lote Parc Rota - Finally) Temp removido: {temp_filepath}")
+                except OSError as oe: print(f"(Preço Lote Parc Rota - Finally) Erro remover temp: {oe}")
+
+    else: # GET
+        active_page = 'importacao_preco_lote_parcelado'
+        return render_template('importacao_preco_lote_parcelado.html', active_page=active_page)
+
+@app.route('/confirmar-preco-incorporacao', methods=['GET', 'POST'])
+def confirmar_processar_preco_incorporacao():
+    tool_prefix = 'preco_incorp_'
+    session_key = f'{tool_prefix}session_data'
+    temp_filepath = None # Para garantir acesso no finally
+
+    # Verificar se os dados necessários estão na sessão
+    if session_key not in session or 'temp_filepath' not in session[session_key] or 'potential_valor_cols' not in session[session_key]:
+        flash('Sessão inválida ou expirada. Por favor, faça o upload novamente.', 'warning')
+        return redirect(url_for('importacao_preco_incorporacao_tool'))
+
+    session_data = session[session_key]
+    temp_filepath = session_data['temp_filepath']
+    potential_valor_cols = session_data['potential_valor_cols']
+
+    # Verificar se o arquivo temporário ainda existe (importante!)
+    if not os.path.exists(temp_filepath):
+        flash('Arquivo temporário não encontrado. Por favor, faça o upload novamente.', 'error')
+        session.pop(session_key, None)
+        return redirect(url_for('importacao_preco_incorporacao_tool'))
+
+    if request.method == 'POST':
+        output_bytes_stream = None # Definir para o finally caso erro ocorra antes da criação
+        # 1. Obter a coluna selecionada pelo usuário
+        selected_col = request.form.get('selected_valor_col')
+        if not selected_col:
+            flash('Nenhuma coluna de valor foi selecionada.', 'error')
+            # Permanece na página de seleção para o usuário corrigir
+            return render_template('selecionar_valor_incorporacao.html',
+                                   active_page='importacao_preco_incorporacao',
+                                   potential_valor_cols=potential_valor_cols,
+                                   session_key=session_key)
+
+        # Validação extra: Verifica se a coluna selecionada estava entre as opções
+        if selected_col not in potential_valor_cols:
+             flash('Seleção inválida. Escolha uma das colunas listadas.', 'error')
+             return render_template('selecionar_valor_incorporacao.html',
+                                   active_page='importacao_preco_incorporacao',
+                                   potential_valor_cols=potential_valor_cols,
+                                   session_key=session_key)
+
+        print(f"(Preço Incorp Process) Coluna de Valor Selecionada: '{selected_col}'")
+
+        # 2. Chamar a função de processamento (passando os dois argumentos)
+        try:
+            # *** CHAMADA CORRETA COM DOIS ARGUMENTOS ***
+            output_csv_stream = processar_preco_incorporacao(temp_filepath, selected_col)
+
+            # Converte StringIO para BytesIO para send_file
+            output_bytes_stream = io.BytesIO(output_csv_stream.getvalue().encode('utf-8-sig'))
+            output_csv_stream.close() # Fecha o StringIO que não será mais usado
+
+            # Define nome do arquivo de saída
+            original_filename = session_data.get('original_filename', 'arquivo')
+            input_basename = original_filename.rsplit('.', 1)[0]
+            output_filename = f"{input_basename}_PREC_INCORP_PROCESSADO.csv"
+            print(f"(Preço Incorp Process) Enviando: {output_filename}")
+
+            # 3. Enviar o arquivo
+            response = send_file(
+                output_bytes_stream,
+                mimetype='text/csv',
+                as_attachment=True,
+                download_name=output_filename
+            )
+
+            # 4. Limpar Sessão APÓS sucesso
+            session.pop(session_key, None)
+            print("(Preço Incorp Process) Sessão limpa após sucesso.")
+
+            # Não limpar o arquivo temporário aqui, o finally cuidará disso
+
+            return response
+
+        except Exception as e:
+            # Erro durante o processamento final
+            flash(f"Erro ao processar o arquivo: {e}", 'error')
+            print(f"(Preço Incorp Process) Erro: {e}")
+            traceback.print_exc()
+            session.pop(session_key, None) # Limpa sessão em caso de erro
+            # Redireciona de volta para a página inicial de upload
+            return redirect(url_for('importacao_preco_incorporacao_tool'))
+
+        finally:
+            # 5. Limpar Arquivo Temporário (SEMPRE, após tentativa de processamento)
+            if temp_filepath and os.path.exists(temp_filepath):
+                try:
+                    os.remove(temp_filepath)
+                    print(f"(Preço Incorp Process - Finally) Temp removido: {temp_filepath}")
+                except OSError as oe:
+                    print(f"(Preço Incorp Process - Finally) Erro remover temp: {oe}")
+            # O stream de bytes será fechado pelo send_file ou já foi fechado (StringIO)
+
+    else: # GET (Mostrar formulário de seleção)
+        active_page = 'importacao_preco_incorporacao'
+        # É importante passar session_key aqui se o template precisar acessar session[session_key]
+        return render_template('selecionar_valor_incorporacao.html',
+                               active_page=active_page,
+                               potential_valor_cols=potential_valor_cols,
+                               session_key=session_key)
 
 # --- Roda a aplicação ---
 if __name__ == "__main__":

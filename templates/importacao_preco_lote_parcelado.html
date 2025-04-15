@@ -1,0 +1,105 @@
+{# templates/importacao_preco_lote_parcelado.html #} {% extends 'base.html' %}
+{% block title %}Importar Tabela Preço - Lote Parcelado{% endblock %} {# <<<
+MUDE O TÍTULO #} {% block styles %} {{ super() }} {# Você pode adicionar estilos
+específicos aqui se precisar #}
+<style>
+  .description {
+    background-color: #cfe2ff;
+    color: #084298;
+    border: 1px solid #b6d4fe;
+    padding: 15px;
+    border-radius: 6px;
+    margin-bottom: 25px;
+    font-size: 0.95em;
+    line-height: 1.5;
+  }
+  .form-container {
+    max-width: 600px;
+    margin: 20px auto;
+    padding: 25px;
+    background-color: #fff;
+    border: 1px solid #dee2e6;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+  }
+</style>
+{% endblock %} {% block content %}
+<div class="container mt-4">
+  <h1>Importar Tabela de Preço - Lote Parcelado</h1>
+  {# <<< MUDE O TÍTULO #}
+
+  <div class="description">
+    {# <<< MUDE A DESCRIÇÃO #}
+    <p>
+      <strong>Instruções:</strong> Faça o upload da planilha de preços de Lote
+      Parcelado. A ferramenta irá processá-la e gerar um novo arquivo no formato
+      padrão.
+    </p>
+    <p>
+      Certifique-se que a planilha contém as colunas [Liste as colunas esperadas
+      para Lote Parcelado aqui].
+    </p>
+  </div>
+
+  {# Bloco para exibir mensagens flash #} {% with messages =
+  get_flashed_messages(with_categories=true) %} {% if messages %} {% for
+  category, message in messages %}
+  <div
+    class="alert alert-{{ category if category != 'message' else 'info' }} alert-dismissible fade show"
+    role="alert"
+  >
+    {{ message }}
+    <button
+      type="button"
+      class="btn-close"
+      data-bs-dismiss="alert"
+      aria-label="Close"
+    ></button>
+  </div>
+  {% endfor %} {% endif %} {% endwith %}
+
+  <div class="form-container">
+    {# <<< MUDE O url_for PARA A ROTA CORRETA #}
+    <form
+      method="post"
+      enctype="multipart/form-data"
+      action="{{ url_for('importacao_preco_lote_parcelado_tool') }}"
+    >
+      <div class="mb-3">
+        <label for="arquivo_entrada_lote_parc" class="form-label"
+          ><strong
+            >Selecione o Arquivo ({% for ext in ALLOWED_EXTENSIONS %}.{{ ext
+            }}{% if not loop.last %}, {% endif %}{% endfor %}):</strong
+          ></label
+        >
+        {# <<< MUDE O ID (opcional) #}
+        <input
+          type="file"
+          class="form-control"
+          id="arquivo_entrada_lote_parc"
+          name="arquivo_entrada"
+          accept="{% for ext in ALLOWED_EXTENSIONS %}.{{ ext }}{% if not loop.last %},{% endif %}{% endfor %}"
+          required
+        />
+        {# <<< MUDE O TEXTO DE AJUDA #}
+        <div class="form-text">
+          Faça upload da planilha de preços de Lote Parcelado.
+        </div>
+      </div>
+
+      <div style="text-align: center; margin-top: 30px">
+        <button type="submit" class="btn btn-primary btn-lg">
+          <i class="fas fa-upload me-2"></i> Importar e Processar
+        </button>
+        <a
+          href="{{ url_for('home') }}"
+          class="btn btn-secondary btn-lg"
+          style="margin-left: 10px"
+          >Cancelar</a
+        >
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %} {% block scripts %} {{ super() }} {# Adicione JS aqui se
+necessário #} {% endblock %}

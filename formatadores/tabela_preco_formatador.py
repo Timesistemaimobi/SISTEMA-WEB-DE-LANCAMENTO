@@ -14,14 +14,18 @@ from openpyxl.utils.cell import range_boundaries
 
 # --- Funções Auxiliares (parse_flexible_float, etc. - Mantidas da v11) ---
 def normalize_text_for_match(text):
+    """Normaliza texto para busca: minúsculo, sem acentos, sem não-alfanuméricos."""
     if not isinstance(text, str): text = str(text)
     try:
+        # Normaliza para decompor acentos, codifica/decodifica para remover, põe em minúsculo
         text = unicodedata.normalize('NFKD', text).encode('ASCII', 'ignore').decode('ASCII')
         text = text.lower()
-        text = re.sub(r'[^a-z0-9]', '', text) # Remove não alfanuméricos
+        # Remove tudo que não for letra ou número
+        text = re.sub(r'[^a-z0-9]', '', text)
         return text.strip()
     except Exception:
-        return str(text).lower().strip() # Fallback
+        # Fallback muito básico se a normalização falhar
+        return str(text).lower().strip().replace(' ', '')
 
 def find_column_flexible(df_columns, concept_keywords, concept_name, required=True):
     normalized_input_cols = {normalize_text_for_match(col): col for col in df_columns}

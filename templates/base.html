@@ -59,6 +59,20 @@
                 </ul>
             </li>
 
+            <li class="dropdown">
+                {# Link principal do NOVO menu #}
+                {# Adiciona 'active' se QUALQUER página de importação de PREÇO estiver ativa #}
+                <a href="#" {% if active_page and active_page.startswith('importacao_preco_') %}class="active"{% endif %}>
+                    Importação Tabela Preço <span class="dropdown-indicator"></span> {# Indicador CSS #}
+                </a>
+                {# Links internos do NOVO menu #}
+                <ul class="dropdown-menu">
+                    <li><a href="{{ url_for('importacao_preco_incorporacao_tool') }}">Preço Incorporação</a></li>
+                    <li><a href="{{ url_for('importacao_preco_lote_avista_tool') }}">Preço Lote à Vista</a></li>
+                    <li><a href="{{ url_for('importacao_preco_lote_parcelado_tool') }}">Preço Lote Parcelado</a></li>
+                </ul>
+            </li>
+
         </ul>
     </div>
   </nav>
