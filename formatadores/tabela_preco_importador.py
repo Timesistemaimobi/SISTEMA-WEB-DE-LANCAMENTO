@@ -169,14 +169,38 @@ def format_brl(value):
         print(f"Aviso format_brl: Não converteu '{value}' para número após limpeza. Retornando vazio."); return ''
 
 def format_area(value):
-    """Limpa valor de área, converte para float e formata com vírgula decimal."""
-    if pd.isna(value) or value == '': return ''
-    s_val = str(value).strip(); s_val = re.sub(r'm[²2]?$', '', s_val, flags=re.IGNORECASE).strip()
-    s_val = re.sub(r'[^\d,.]', '', s_val)
-    if ',' in s_val and '.' in s_val: s_val = s_val.replace('.', '').replace(',', '.')
-    elif ',' in s_val: s_val = s_val.replace(',', '.')
-    try: num = float(s_val); return f"{num:.2f}".replace('.', ',')
-    except (ValueError, TypeError): print(f"Aviso format_area: Não formatou valor '{value}' como área."); return str(value).strip()
+    """
+    Limpa valor de área, converte para float, formata com vírgula decimal
+    e duas casas, e encapsula em '="valor"' para forçar tratamento como texto no Excel.
+    """
+    if pd.isna(value) or value == '':
+        return '' # Retorna vazio para valores nulos ou vazios
+    original_value_str = str(value).strip()
+    s_val = original_value_str
+    # Remove sufixo comum (m², m2)
+    s_val = re.sub(r'm[²2]?$', '', s_val, flags=re.IGNORECASE).strip()
+    # Remove caracteres não permitidos, mantendo dígitos, vírgula, ponto e sinal negativo
+    s_val = re.sub(r'[^\d,.-]', '', s_val)
+
+    # Padroniza separador decimal para ponto (.) antes de converter para float
+    if ',' in s_val and '.' in s_val:
+        # Assume '.' como separador de milhar e ',' como decimal
+        s_val = s_val.replace('.', '').replace(',', '.')
+    elif ',' in s_val:
+        # Assume ',' como único separador (decimal)
+        s_val = s_val.replace(',', '.')
+    # Agora s_val deve ter '.' como separador decimal, se houver
+
+    try:
+        num = float(s_val)
+        # Formata para duas casas decimais e troca ponto por vírgula para o padrão BR
+        formatted_area = f"{num:.2f}".replace('.', ',')
+        # Encapsula para forçar texto no Excel
+        return f'="{formatted_area}"' # <<< MUDANÇA PRINCIPAL AQUI
+    except (ValueError, TypeError):
+        # Se a conversão falhar, retorna vazio
+        print(f"Aviso format_area: Não converteu valor limpo '{s_val}' (original: '{original_value_str}') para float. Retornando vazio.")
+        return ''
 
 # --- Função Principal para Tabela Incorporação ---
 def processar_preco_incorporacao(input_filepath, selected_valor_column_name):
@@ -276,6 +300,7 @@ def processar_preco_lote_avista(input_file_object):
         # Usa o nome da coluna encontrado na etapa 3 como a coluna da quadra
         col_quadra = new_columns[quadra_col_index] # Pega o NOME da coluna Quadra
         col_lote = find_column_flexible(df_input.columns, ['lote', 'lt', 'unidade'], 'LOTE', required=True)
+        col_area = find_column_flexible(df_input.columns, ['area', 'área', 'area privativa', 'área privativa', 'metragem'], 'ÁREA', required=True)
         col_valor = find_column_flexible(df_input.columns, ['valor a vista', 'valor à vista', 'preco a vista', 'preço à vista', 'valor avista', 'valor com registro', 'valor'], 'VALOR À VISTA', required=True)
         print("--- Fim da Busca ---")
 
@@ -299,7 +324,8 @@ def processar_preco_lote_avista(input_file_object):
         lote_formatado_num = df_input[col_lote].fillna('').astype(str).str.extract(r'(\d+)', expand=False).fillna('0').astype(int).apply(lambda x: f"{x:02d}")
         df_output['UNIDADE'] = "QD" + quadra_formatada_num + " - LOTE " + lote_formatado_num
 
-        # 8.3. Coluna VALOR À VISTA (formatada como moeda BRL)
+        # 8.3. Coluna VALOR À VISTA (formatada como moeda BRL) e ÁREA PRIVATIVA
+        df_output['ÁREA PRIVATIVA'] = df_input[col_area].apply(format_area)
         df_output['VALOR À VISTA'] = df_input[col_valor].apply(format_brl)
 
         # 8.4. Coluna ETAPA (fixa)
@@ -314,11 +340,15 @@ def processar_preco_lote_avista(input_file_object):
         print(f"Linhas após a filtragem final: {len(df_output_filtrado)}")
 
         # 10. Selecionar e Reordenar Colunas Finais
-        df_output_final = df_output_filtrado[['ETAPA', 'BLOCO', 'UNIDADE', 'VALOR À VISTA']]
+        colunas_finais = ['ETAPA', 'BLOCO', 'UNIDADE', 'ÁREA PRIVATIVA', 'VALOR À VISTA']
+        df_output_final = df_output_filtrado[colunas_finais]
+        print(f"Colunas finais selecionadas: {df_output_final.columns.tolist()}")
 
         # 11. Gerar CSV em memória
         output_csv = io.StringIO()
+        # --- MODIFICADO: Voltar para QUOTE_MINIMAL, pois format_area agora força texto com ="..." ---
         df_output_final.to_csv(output_csv, sep=';', encoding='utf-8-sig', index=False, decimal=',', quoting=csv.QUOTE_MINIMAL)
+        # --- FIM MODIFICADO ---
         output_csv.seek(0)
 
         print("(Preço Lote Avista) Processamento concluído. CSV gerado.")
