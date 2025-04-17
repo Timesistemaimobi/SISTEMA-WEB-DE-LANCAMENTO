@@ -25,7 +25,7 @@ def parse_numeric(value):
     try:
         return float(s_val)
     except (ValueError, TypeError):
-        print(f"Aviso parse_numeric: Não converteu '{value}' para número.")
+        # print(f"Aviso parse_numeric: Não converteu '{value}' para número.") # Reduzir verbosidade
         return pd.NA # Retorna Nulo do Pandas em caso de erro
 
 def normalize_text_for_match(text):
@@ -139,7 +139,9 @@ def format_brl(value):
     """Converte valor numérico ou string para formato moeda BRL (R$ #.###,##) de forma manual."""
     if pd.isna(value) or value == '': return ''
     s_val = str(value).strip()
-    if re.search(r'[a-gi-qs-zA-GI-QS-Z]', s_val): print(f"Aviso format_brl: Valor '{value}' contém letras inesperadas. Retornando vazio."); return ''
+    if re.search(r'[a-gi-qs-zA-GI-QS-Z]', s_val):
+        # print(f"Aviso format_brl: Valor '{value}' contém letras inesperadas. Retornando vazio.") # Reduzir verbosidade
+        return ''
     s_val = re.sub(r'[^\d,.-]', '', s_val) # Remove tudo exceto dígitos, vírgula, ponto, sinal
     if ',' in s_val and '.' in s_val: s_val = s_val.replace('.', '').replace(',', '.')
     elif ',' in s_val: s_val = s_val.replace(',', '.')
@@ -166,7 +168,8 @@ def format_brl(value):
         return f"R$ {sinal}{parte_inteira_com_milhar},{parte_decimal}"
         # --- Fim da Formatação Manual ---
     except (ValueError, TypeError):
-        print(f"Aviso format_brl: Não converteu '{value}' para número após limpeza. Retornando vazio."); return ''
+        # print(f"Aviso format_brl: Não converteu '{value}' para número após limpeza. Retornando vazio.") # Reduzir verbosidade
+        return ''
 
 def format_area(value):
     """
@@ -201,34 +204,165 @@ def format_area(value):
         # Se a conversão falhar, retorna vazio
         print(f"Aviso format_area: Não converteu valor limpo '{s_val}' (original: '{original_value_str}') para float. Retornando vazio.")
         return ''
+    
+def formatar_nome_unidade_generico(row, col_ident_1_name, col_ident_2_name, col_tipologia_name, prefixo_1, prefixo_2):
+    """
+    Formata o nome da unidade (PREFIXO1 XX - PREFIXO2 YY ou com PCD),
+    usando os prefixos e nomes de colunas fornecidos.
+    Verifica PCD em TIPOLOGIA e no IDENTIFICADOR 2.
+    """
+    ident_1_val = row.get(col_ident_1_name, '')
+    ident_2_val = row.get(col_ident_2_name, '')
+    tipologia_val = row.get(col_tipologia_name, '') # Usado para checar 'PCD'
+
+    is_pcd = False # Flag para indicar se é PCD
+    # 1. Checa PCD na Tipologia
+    if pd.notna(tipologia_val):
+        tipologia_norm = normalize_text(str(tipologia_val)) # Usa normalize_text (UPPER, sem acento)
+        if 'PCD' in tipologia_norm: is_pcd = True
+        # print(f"DEBUG PCD Check (Tipo): {ident_1_val=}, {ident_2_val=}, Tipo Norm='{tipologia_norm}', IsPCD={is_pcd}") # DEBUG
+
+    # 2. Checa PCD no Identificador 2 (se não achou na tipologia)
+    if not is_pcd and pd.notna(ident_2_val):
+         ident_2_norm = normalize_text(str(ident_2_val)) # Usa normalize_text (UPPER, sem acento)
+         if 'PCD' in ident_2_norm: is_pcd = True
+         # print(f"DEBUG PCD Check (Ident 2): {ident_1_val=}, {ident_2_val=}, Ident2 Norm='{ident_2_norm}', IsPCD={is_pcd}") # DEBUG
+
+    pcd_suffix = " (PCD)" if is_pcd else ""
+
+    if pd.notna(ident_1_val) and str(ident_1_val).strip() and pd.notna(ident_2_val) and str(ident_2_val).strip():
+        try:
+            # Extrai número do Identificador 1 (Bloco/Quadra)
+            ident_1_num_match = re.search(r'\d+', str(ident_1_val))
+            ident_1_num_str = f"{int(ident_1_num_match.group(0)):02d}" if ident_1_num_match else str(ident_1_val).strip() if str(ident_1_val).strip() else "??"
+            ident_1_str = f"{prefixo_1}{ident_1_num_str}" # Usa o prefixo determinado
+
+            # Extrai número do Identificador 2 (Apto/Casa)
+            ident_2_num_match = re.search(r'\d+', str(ident_2_val))
+            ident_2_num_str = f"{int(ident_2_num_match.group(0)):02d}" if ident_2_num_match else str(ident_2_val).strip() if str(ident_2_val).strip() else "??"
+            ident_2_str = f"{prefixo_2} {ident_2_num_str}" # Usa o prefixo determinado
+
+            # Remove "(PCD)" do identificador 2 antes de adicionar o sufixo (para evitar duplicação)
+            ident_2_str_cleaned = re.sub(r'\s?\(PCD\)', '', ident_2_str, flags=re.IGNORECASE).strip()
+
+            return f"{ident_1_str} - {ident_2_str_cleaned}{pcd_suffix}"
+        except Exception as e:
+            print(f"Erro formatar_nome_unidade_generico: {e} para {col_ident_1_name}='{ident_1_val}', {col_ident_2_name}='{ident_2_val}'")
+            # Fallback mais robusto usando os prefixos
+            ident_1_s = str(ident_1_val).strip()
+            ident_2_s = str(ident_2_val).strip()
+            ident_2_s_cleaned = re.sub(r'\s?\(PCD\)', '', ident_2_s, flags=re.IGNORECASE).strip()
+            return f"{prefixo_1}{ident_1_s} - {prefixo_2} {ident_2_s_cleaned}{pcd_suffix}"
+    elif pd.notna(ident_1_val) and str(ident_1_val).strip(): # Caso tenha só o primeiro identificador
+         print(f"Aviso: Unidade com apenas identificador 1: '{ident_1_val}'")
+         return f"{prefixo_1}{str(ident_1_val).strip()}_INCOMPLETO"
+    return "UNIDADE_ERRO" # Retorna erro se faltar informação crucial
 
 # --- Função Principal para Tabela Incorporação ---
 def processar_preco_incorporacao(input_filepath, selected_valor_column_name):
-    """Lê Excel incorporação, processa e retorna StringIO CSV."""
+    """
+    Lê Excel incorporação, processa (identificando Bloco/Quadra e Apto/Casa),
+    e retorna StringIO CSV.
+    """
     print(f"(Preço Incorporação) Iniciando: {input_filepath}, Col Valor: '{selected_valor_column_name}'")
     try:
-        linhas_para_ignorar = 2
-        try: df_input = pd.read_excel(input_filepath, engine='openpyxl', skiprows=linhas_para_ignorar, header=0, dtype=str).dropna(how='all').reset_index(drop=True)
-        except Exception as e_read: raise ValueError(f"Falha ao ler Excel.") from e_read
-        if df_input.empty: raise ValueError("Arquivo vazio ou sem dados.")
-        print(f"(Preço Incorporação) Lidas {len(df_input)} linhas.")
+        # 1. Leitura do Excel (pode precisar ajustar skiprows se o cabeçalho variar muito)
+        # Tenta ler com cabeçalho na linha 3 (índice 2), mas pode ser ajustado
+        header_row = 2
+        try:
+            df_input = pd.read_excel(input_filepath, engine='openpyxl', header=header_row, dtype=str)
+            # Remove linhas completamente vazias ANTES de remover colunas
+            df_input = df_input.dropna(how='all').reset_index(drop=True)
+            # Remove colunas completamente vazias
+            df_input = df_input.dropna(axis=1, how='all')
+        except Exception as e_read:
+            raise ValueError(f"Falha ao ler Excel (linha cabeçalho={header_row}). Verifique o arquivo e a linha do cabeçalho.") from e_read
+
+        if df_input.empty: raise ValueError("Arquivo vazio ou sem dados após leitura inicial.")
+        print(f"(Preço Incorporação) Lidas {len(df_input)} linhas válidas.")
         df_input.columns = df_input.columns.str.strip(); print(f"Colunas: {df_input.columns.tolist()}")
-        if selected_valor_column_name not in df_input.columns: raise ValueError(f"Coluna '{selected_valor_column_name}' não encontrada.")
-        print("--- Buscando Cols ---"); col_bloco = find_column_flexible(df_input.columns, ['bloco', 'quadra'], 'BLOCO', required=True); col_apt = find_column_flexible(df_input.columns, ['apt', 'apto', 'apartamento', 'casa'], 'APT', required=True); col_tipologia = find_column_flexible(df_input.columns, ['tipologia', 'tipo da unidade', 'descricao'], 'TIPOLOGIA', required=True); print("--- Fim Busca ---")
-        print(f"Aplicando ffill Bloco: '{col_bloco}'"); df_input[col_bloco] = df_input[col_bloco].ffill()
-        print(f"Aplicando ffill Tipologia: '{col_tipologia}'"); df_input[col_tipologia] = df_input[col_tipologia].ffill()
+        if selected_valor_column_name not in df_input.columns:
+            raise ValueError(f"Coluna de valor selecionada '{selected_valor_column_name}' não encontrada nas colunas lidas: {df_input.columns.tolist()}")
+
+        # 2. Buscar Colunas Essenciais (de forma genérica)
+        print("--- Buscando Cols Essenciais ---")
+        col_ident_1 = find_column_flexible(df_input.columns, ['bloco', 'quadra'], 'IDENTIFICADOR 1 (Bloco/Quadra)', required=True)
+        col_ident_2 = find_column_flexible(df_input.columns, ['apt', 'apto', 'apartamento', 'casa', 'unidade'], 'IDENTIFICADOR 2 (Apto/Casa/Unidade)', required=True)
+        # Tipologia ainda é útil para checar PCD e para ffill
+        col_tipologia = find_column_flexible(df_input.columns, ['tipologia', 'tipo da unidade', 'descricao', 'descrição'], 'TIPOLOGIA', required=True)
+        print("--- Fim Busca Cols ---")
+
+        # 3. Determinar Prefixos com base nos nomes das colunas encontradas
+        norm_col_ident_1 = normalize_text_for_match(col_ident_1)
+        norm_col_ident_2 = normalize_text_for_match(col_ident_2)
+
+        prefixo_1 = "QD" if 'quadra' in norm_col_ident_1 else "BL"
+        prefixo_2 = "CASA" if 'casa' in norm_col_ident_2 else "APT" # Default para APT se não for casa
+
+        print(f"  >> Formato da unidade determinado: {prefixo_1}xx - {prefixo_2} yy")
+
+        # 4. Aplicar ffill (Forward Fill) onde apropriado
+        # Geralmente o Bloco/Quadra e Tipologia podem precisar de ffill
+        print(f"Aplicando ffill na coluna Identificador 1: '{col_ident_1}'")
+        df_input[col_ident_1] = df_input[col_ident_1].ffill()
+        print(f"Aplicando ffill na coluna Tipologia: '{col_tipologia}'")
+        df_input[col_tipologia] = df_input[col_tipologia].ffill()
+        # O Identificador 2 (Apto/Casa) geralmente NÃO deve ter ffill
+
+        # 5. Remover linhas onde o Identificador 2 (Apto/Casa) é nulo ou vazio APÓS ffill das outras
+        # Isso ajuda a remover linhas de cabeçalho repetido ou totais que não foram puladas
+        print(f"Linhas antes de dropna em '{col_ident_2}': {len(df_input)}")
+        df_input = df_input.dropna(subset=[col_ident_2])
+        df_input = df_input[df_input[col_ident_2].astype(str).str.strip() != '']
+        df_input = df_input.reset_index(drop=True)
+        print(f"Linhas após dropna e filtro de vazio em '{col_ident_2}': {len(df_input)}")
+        if df_input.empty: raise ValueError(f"Nenhuma linha válida encontrada após remover linhas sem valor em '{col_ident_2}'.")
+
+
+        # 6. Construir DataFrame de Saída
         df_output = pd.DataFrame(index=df_input.index)
-        bloco_formatado = df_input[col_bloco].fillna('').astype(str).str.extract(r'(\d+)', expand=False).fillna('0').astype(int).apply(lambda x: f"{x:02d}")
-        df_output['BLOCO'] = bloco_formatado.apply(lambda x: f'="{x}"')
-        df_input['BLOCO_INPUT'] = df_input[col_bloco]; df_input['APT_INPUT'] = df_input[col_apt]; df_input['TIPOLOGIA_INPUT'] = df_input[col_tipologia]
-        df_output['UNIDADE'] = df_input.apply(formatar_nome_unidade, axis=1)
+
+        # Coluna BLOCO (Saída): Contém o número formatado do Identificador 1 (seja Bloco ou Quadra)
+        ident_1_formatado = df_input[col_ident_1].fillna('').astype(str).str.extract(r'(\d+)', expand=False).fillna('0').astype(int).apply(lambda x: f"{x:02d}")
+        df_output['BLOCO'] = ident_1_formatado.apply(lambda x: f'="{x}"') # Força texto no Excel
+
+        # Coluna UNIDADE (Saída): Usa a nova função genérica
+        df_output['UNIDADE'] = df_input.apply(
+            formatar_nome_unidade_generico,
+            axis=1,
+            args=(col_ident_1, col_ident_2, col_tipologia, prefixo_1, prefixo_2) # Passa nomes das colunas e prefixos
+        )
+
+        # Coluna VALOR DO IMOVEL (Saída)
         df_output['VALOR DO IMOVEL'] = df_input[selected_valor_column_name].apply(format_brl)
+
+        # Coluna ETAPA (Saída)
         df_output['ETAPA'] = 'ETAPA 01'
+
+        # 7. Selecionar e Reordenar Colunas Finais
         df_output = df_output[['ETAPA', 'BLOCO', 'UNIDADE', 'VALOR DO IMOVEL']]
-        output_csv = io.StringIO(); df_output.to_csv(output_csv, sep=';', encoding='utf-8-sig', index=False, decimal=',', quoting=csv.QUOTE_MINIMAL)
-        output_csv.seek(0); print("(Preço Incorporação) Processamento concluído."); return output_csv
-    except ValueError as ve: print(f"(Preço Incorporação) ERRO VALIDAÇÃO: {ve}"); traceback.print_exc(); raise ve
-    except Exception as e: print(f"(Preço Incorporação) ERRO INESPERADO: {e}"); traceback.print_exc(); raise RuntimeError(f"Erro inesperado: {e}") from e
+
+        # 8. Filtrar linhas onde a UNIDADE deu erro (opcional, mas recomendado)
+        print(f"Linhas antes de filtrar UNIDADE_ERRO: {len(df_output)}")
+        df_output = df_output[df_output['UNIDADE'] != "UNIDADE_ERRO"]
+        print(f"Linhas após filtrar UNIDADE_ERRO: {len(df_output)}")
+        if df_output.empty: raise ValueError("Nenhuma unidade pôde ser formatada corretamente.")
+
+        # 9. Gerar CSV em memória
+        output_csv = io.StringIO()
+        df_output.to_csv(output_csv, sep=';', encoding='utf-8-sig', index=False, decimal=',', quoting=csv.QUOTE_MINIMAL)
+        output_csv.seek(0)
+        print("(Preço Incorporação) Processamento concluído.")
+        return output_csv
+
+    except ValueError as ve:
+        print(f"(Preço Incorporação) ERRO VALIDAÇÃO: {ve}")
+        traceback.print_exc()
+        raise ve
+    except Exception as e:
+        print(f"(Preço Incorporação) ERRO INESPERADO: {e}")
+        traceback.print_exc()
+        raise RuntimeError(f"Erro inesperado no processamento Incorporação: {e}") from e
 
 
 # --- Função para Tabela Lote à Vista (COM DEBUG E pd.to_numeric na Quadra) ---
