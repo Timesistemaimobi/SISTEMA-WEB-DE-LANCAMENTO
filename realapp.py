@@ -6,6 +6,8 @@ import unicodedata
 import xlwt # Para escrever arquivos .xls
 import csv
 import openpyxl # Necessário para engine='openpyxl' do pandas
+from openpyxl.utils import get_column_letter
+from openpyxl.styles import Font, Alignment, PatternFill # Para possíveis estilos futuros
 import re # Para limpeza numérica e busca de colunas
 import traceback # Para erros detalhados
 from flask import (
@@ -13,13 +15,14 @@ from flask import (
     send_file, flash, session, abort
 )
 from werkzeug.utils import secure_filename
-from formatadores.tabela_preco_formatador import find_column_flexible, normalize_text_for_match, extract_block_number_safe
-from formatadores.tabela_preco_formatador import processar_tabela_precos_web
+from formatadores.tabela_preco_formatador import find_column_flexible, normalize_text_for_match, extract_block_number_safe, parse_flexible_float
+from formatadores.tabela_preco_formatador import processar_tabela_precos_web                            
 from formatadores.tabela_preco_importador import (
     processar_preco_incorporacao,
     processar_preco_lote_avista,
     processar_preco_lote_parcelado
 )
+from formatadores.incorporacao_formatador import processar_incorporacao_web
 
 
 # --- Constantes ---
@@ -49,6 +52,27 @@ if not os.path.exists(app.config['UPLOAD_FOLDER']): os.makedirs(app.config['UPLO
 # --- Funções Auxiliares Globais ---
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
+def format_decimal_br(value, precision):
+    if pd.isna(value):
+        return "" # Ou talvez '--' ou 0.0? Depende do que prefere para vazios
+    try:
+        num = float(value) # Tenta converter direto
+        format_string = f"{{:.{precision}f}}"
+        return format_string.format(num).replace('.', ',')
+    except (ValueError, TypeError):
+        # Se falhar, tenta limpar como número BR e converter
+        s_val = str(value).strip()
+        s_val = re.sub(r'[^\d,.-]', '', s_val)
+        if ',' in s_val and '.' in s_val: s_val = s_val.replace('.', '').replace(',', '.')
+        elif ',' in s_val: s_val = s_val.replace(',', '.')
+        try:
+            num = float(s_val)
+            format_string = f"{{:.{precision}f}}"
+            return format_string.format(num).replace('.', ',')
+        except (ValueError, TypeError):
+            print(f"Aviso format_decimal_br: Não formatou '{value}' com precisão {precision}.")
+            return str(value) # Retorna original se tudo falhar
 
 # --- Funções Auxiliares CV ---
 def normalize_text(text):
@@ -221,35 +245,171 @@ def formatar_unidade_sienge_lote(row, col_q, col_l):
 def limpar_converter_numerico_sienge_lote(v): return limpar_converter_numerico_lote(v) # Reutiliza
 
 # --- Funções Auxiliares Formatador Incorporação ---
-def processar_incorporacao_web(input_filepath):
-    print(f"(Incorp) Processando: {input_filepath}")
+def processar_formatador_incorporacao_avancado(input_filepath):
+    """
+    Processa a planilha de incorporação (versão reestruturada):
+    - Lê o cabeçalho da linha 3.
+    - Usa a coluna 'QUADRA' dos dados para criar 'QUADRA_NUM'.
+    - Remove colunas sem nome no cabeçalho original.
+    - Aplica formatação numérica específica (casas decimais).
+    """
+    print(f"(Incorp Reestruturado) Processando: {input_filepath}")
+    output = io.BytesIO()
+
     try:
-        df = pd.read_excel(input_filepath, header=None, dtype=str); df['Bloco'] = None
-        ultimo_bloco = None; rows_to_del = []
-        print(f"(Incorp) Varrendo {len(df)} linhas...")
-        for idx, row in df.iterrows():
-            cell_val = str(row.iloc[0]).strip() if pd.notna(row.iloc[0]) else ""
-            is_q = cell_val.lower().startswith("quadra"); is_b = re.search(r'^\s*bloco', cell_val, re.IGNORECASE)
-            if is_q or is_b:
-                print(f"  Linha {idx+1}: {'QUADRA' if is_q else 'BLOCO'} ('{cell_val}')") # idx+1 para num linha Excel
-                rows_to_del.append(idx); bloco_num = None
-                match = re.search(r'(?:quadra|bloco)\s*(?:n[o°.\s]?|número)?\s*(\d+)', cell_val, re.IGNORECASE)
-                if match:
-                    try: bloco_num = match.group(1).zfill(2); print(f"    Bloco: {bloco_num}")
-                    except: print(f"    Erro extrair num: '{cell_val}'")
-                if bloco_num: ultimo_bloco = bloco_num
-                continue
-            elif ultimo_bloco is not None: df.loc[idx, 'Bloco'] = ultimo_bloco
-        print(f"(Incorp) Índices p/ del: {rows_to_del}")
-        df_proc = df.drop(index=rows_to_del).copy()
-        cols_orig = [c for c in df_proc.columns if c != 'Bloco']
-        # Garante que Bloco seja a última coluna, mesmo se não houver outras
-        df_proc = df_proc[cols_orig + (['Bloco'] if 'Bloco' in df_proc.columns else [])]
-        print(f"(Incorp) Processado. {len(df_proc)} linhas.")
-        output = io.BytesIO(); df_proc.to_excel(output, header=False, index=False, engine='openpyxl')
-        output.seek(0); print("(Incorp) Excel em memória.")
+        # 1. Leitura Direta com Cabeçalho na Linha 3 (índice 2)
+        try:
+            df_input = pd.read_excel(input_filepath, header=2, dtype=str) # Lê tudo como string inicialmente
+            # Remove linhas que são completamente NA (podem aparecer no final)
+            df_input.dropna(how='all', inplace=True)
+            # Limpa nomes das colunas lidas
+            df_input.columns = [str(col).strip() for col in df_input.columns]
+            print(f"(Incorp Reestruturado) Lidas {len(df_input)} linhas de dados. Colunas lidas: {df_input.columns.tolist()}")
+        except Exception as e:
+            print(f"(Incorp Reestruturado) ERRO ao ler Excel (header=2): {e}")
+            # Tenta ler sem header específico como fallback, pode não ser ideal
+            try:
+                print("(Incorp Reestruturado) Tentando ler sem header específico...")
+                df_input = pd.read_excel(input_filepath, dtype=str)
+                df_input.dropna(how='all', inplace=True)
+                # Tenta encontrar header manualmente (complexo, melhor avisar usuário)
+                raise ValueError(f"Falha ao ler o arquivo Excel com header na linha 3. Verifique o arquivo. Erro: {e}")
+            except Exception as e2:
+                 raise ValueError(f"Falha grave ao ler o arquivo Excel. Verifique o formato. Erros: {e}, {e2}")
+
+
+        # 2. Filtrar Colunas "Unnamed" (geradas por cabeçalhos vazios)
+        original_columns = df_input.columns.tolist()
+        cols_to_keep = [col for col in original_columns if not str(col).startswith('Unnamed:')]
+        if len(cols_to_keep) < len(original_columns):
+             removed_cols = [col for col in original_columns if col not in cols_to_keep]
+             print(f"(Incorp Reestruturado) Removendo colunas sem nome no cabeçalho: {removed_cols}")
+        df_proc = df_input[cols_to_keep].copy() # Cria cópia com colunas válidas
+
+        # 3. Criar Coluna QUADRA_NUM a partir da coluna original 'QUADRA'
+        quadra_col_orig_name = find_column_flexible(df_proc.columns, ['quadra', 'bloco'], 'QUADRA', required=True)
+        quadra_col_name = "QUADRA" # Nome da nova coluna a ser criada
+
+        def format_quadra_num(q_val):
+            if pd.isna(q_val) or str(q_val).strip() == '': return ''
+            try:
+                # Converte para float primeiro (caso seja "1.0") depois para int
+                return f"{int(float(str(q_val))):02d}"
+            except (ValueError, TypeError):
+                return str(q_val).strip() # Retorna original se não converter
+
+        # Aplica a formatação para criar a nova coluna
+        df_proc[quadra_col_name] = df_proc[quadra_col_orig_name].apply(format_quadra_num)
+        print(f"(Incorp Reestruturado) Coluna '{quadra_col_name}' criada a partir de '{quadra_col_orig_name}'.")
+
+        # 4. Reordenar Colunas (QUADRA_NUM primeiro)
+        # Garante que a coluna original 'QUADRA' não seja duplicada se tiver o mesmo nome normalizado
+        final_columns_order = [quadra_col_name]
+        for col in df_proc.columns:
+             # Adiciona se não for a nova coluna de quadra e nem a original
+             if col != quadra_col_name and col != quadra_col_orig_name:
+                 final_columns_order.append(col)
+        # OU se quiser MANTER a coluna QUADRA original também:
+        # final_columns_order = [quadra_col_name] + [col for col in df_proc.columns if col != quadra_col_name]
+
+        df_proc = df_proc[final_columns_order]
+        print(f"(Incorp Reestruturado) Ordem final das colunas: {df_proc.columns.tolist()}")
+
+        # 5. Escrever no Excel e Aplicar Formatação Numérica
+        with pd.ExcelWriter(output, engine='openpyxl') as writer:
+            df_proc.to_excel(writer, sheet_name='Incorporacao Formatada', index=False, header=True)
+
+            workbook_out = writer.book
+            worksheet_out = writer.sheets['Incorporacao Formatada']
+            print("(Incorp Reestruturado) Aplicando formatação numérica no Excel...")
+
+            # Mapeamento: Nome da coluna NORMALIZADO -> formato Excel
+            col_formats = {
+                'areaconstruida': '0.00',
+                'quintal': '0.00',
+                'areadescobertafrontal': '0.00', # Precisa ter essa coluna no header da linha 3
+                'areaprivativa': '0.00', # Formato visual 'XXX,XX' não existe, 0.00 dá 2 casas
+                'fracaoideal': '0.00000' # 5 casas decimais
+            }
+            # Mapeamento de nome normalizado para nome real no DataFrame FINAL
+            df_cols_normalized = {normalize_text_for_match(col): col for col in df_proc.columns}
+
+            # Encontra os índices (base 1) das colunas a serem formatadas no df_proc
+            col_indices_to_format = {} # col_index (1-based) -> format_string
+            found_formats_applied = []
+            for norm_name, fmt_str in col_formats.items():
+                real_col_name = df_cols_normalized.get(norm_name)
+                if real_col_name:
+                    try:
+                        col_index_0based = df_proc.columns.get_loc(real_col_name)
+                        col_indices_to_format[col_index_0based + 1] = fmt_str
+                        found_formats_applied.append(real_col_name)
+                    except KeyError:
+                         print(f"  AVISO INTERNO: Coluna '{real_col_name}' (de '{norm_name}') não encontrada no índice do df_proc.")
+                else:
+                    # Só avisa se a coluna não foi encontrada entre as colunas válidas
+                     if norm_name not in ['areadescobertafrontal']: # Exemplo: não avisa se esta for opcional
+                         print(f"  AVISO: Coluna para formato '{norm_name}' não encontrada no cabeçalho (linha 3) ou foi filtrada.")
+
+            print(f"(Incorp Reestruturado) Formatos serão aplicados para: {found_formats_applied}")
+            if not col_indices_to_format:
+                 print("(Incorp Reestruturado) AVISO: Nenhuma coluna encontrada para aplicar formatação numérica.")
+
+
+            # Aplica o formato às células numéricas nas colunas corretas
+            # Itera pelas linhas de dados (começando da linha 2 do Excel)
+            for row_idx in range(2, worksheet_out.max_row + 1):
+                # Itera pelas colunas que precisam de formatação
+                for col_idx_1based, fmt_str in col_indices_to_format.items():
+                    cell = worksheet_out.cell(row=row_idx, column=col_idx_1based)
+                    # Tenta converter valor para float ANTES de aplicar formato
+                    try:
+                        numeric_value = parse_flexible_float(cell.value) # Usa a função importada
+                        if numeric_value is not None:
+                           cell.value = numeric_value # Garante que o valor na célula é numérico
+                           cell.number_format = fmt_str
+                        elif str(cell.value).strip() == '': # Se for vazio após parse, deixa vazio
+                             cell.value = None
+                        # Se não for conversível, mantém o valor original (string) sem formato
+                    except Exception as e_fmt:
+                        # Debug: Ajuda a entender por que falhou
+                        # print(f"  Debug format error R{row_idx}C{col_idx_1based} Val:'{cell.value}' Err:{e_fmt}")
+                        pass # Mantém valor original se parse_flexible_float falhar
+
+            # Ajusta largura das colunas
+            print("(Incorp Reestruturado) Ajustando largura das colunas...")
+            for i, column_name in enumerate(df_proc.columns):
+                column_letter = get_column_letter(i + 1)
+                try:
+                    # Lógica simples de largura baseada no conteúdo + cabeçalho
+                    max_len_data = 0
+                    if column_name in df_proc and not df_proc[column_name].empty:
+                         # Calcula o máximo comprimento dos dados como string
+                         max_len_data = df_proc[column_name].astype(str).map(len).max()
+
+                    max_len_header = len(str(column_name))
+                    # Pega o maior entre o dado mais longo e o cabeçalho, adiciona margem
+                    width = max(max_len_data, max_len_header) + 3
+                    # Limita a largura máxima
+                    worksheet_out.column_dimensions[column_letter].width = min(width, 60)
+                except Exception as e_width:
+                     print(f"  Aviso: Falha ao ajustar largura da coluna {column_letter} ('{column_name}'): {e_width}")
+                     worksheet_out.column_dimensions[column_letter].width = 15 # Fallback
+
+        output.seek(0)
+        print("(Incorp Reestruturado) Processamento concluído.")
         return output
-    except Exception as e: print(f"(Incorp) ERRO: {e}"); traceback.print_exc(); raise e
+
+    except ValueError as ve: # Erros de validação (leitura, coluna não encontrada)
+         print(f"(Incorp Reestruturado) ERRO VALIDAÇÃO: {ve}")
+         # Garante que o stream seja fechado se criado antes do erro
+         if output: output.close()
+         raise ve # Re-lança para o Flask mostrar
+    except Exception as e:
+        print(f"(Incorp Reestruturado) ERRO INESPERADO: {e}")
+        traceback.print_exc()
+        if output: output.close()
+        raise RuntimeError(f"Erro inesperado no processamento do Formatador Incorporação: {e}") from e
 
 # --- Funções Auxiliares Formatador Lote ---
 def add_lt_prefix_if_needed_fmt_lote(v_str):
@@ -719,34 +879,51 @@ def formatador_incorporacao_tool():
     output_stream = None
 
     if request.method == 'POST':
-        if 'arquivo_entrada' not in request.files: flash('Nenhum arquivo selecionado!', 'error'); return redirect(url_for('formatador_incorporacao_tool'))
+        if 'arquivo_entrada' not in request.files: flash('Nenhum arquivo!', 'error'); return redirect(url_for('formatador_incorporacao_tool'))
         file = request.files['arquivo_entrada']
-        if file.filename == '': flash('Nenhum arquivo selecionado!', 'error'); return redirect(url_for('formatador_incorporacao_tool'))
-        if not file or not allowed_file(file.filename): flash('Tipo de arquivo inválido.', 'error'); return redirect(url_for('formatador_incorporacao_tool'))
-        filename = secure_filename(f"{tool_prefix}{file.filename}"); temp_filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename);
-        try:
-            file.save(temp_filepath); print(f"(Incorp) Arquivo salvo: {temp_filepath}")
-            output_stream = processar_incorporacao_web(temp_filepath) # Chama a função de processamento
-            input_basename = file.filename.rsplit('.', 1)[0]; output_filename = f"planilha_processada_{input_basename}.xlsx"
-            print(f"(Incorp) Enviando: {output_filename}")
-            return send_file(output_stream, mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', as_attachment=True, download_name=output_filename)
-        except Exception as e:
-            flash(f"Erro Incorp: {e}", 'error'); print(f"(Incorp) Erro: {e}"); traceback.print_exc()
-            # Limpeza em caso de erro ANTES do send_file
-            if os.path.exists(temp_filepath):
-                try: os.remove(temp_filepath)
-                except OSError: pass
-            if output_stream: output_stream.close() # Fecha o stream se deu erro ANTES do send_file
+        if file.filename == '': flash('Nenhum arquivo!', 'error'); return redirect(url_for('formatador_incorporacao_tool'))
+        # Valida extensão (somente Excel)
+        if not file or file.filename.rsplit('.', 1)[1].lower() not in {'xlsx', 'xls'}:
+            flash('Tipo de arquivo inválido. Use .xlsx ou .xls.', 'error')
             return redirect(url_for('formatador_incorporacao_tool'))
-        finally:
-             # Limpeza do ARQUIVO temporário SEMPRE
-             if temp_filepath and os.path.exists(temp_filepath):
-                try: os.remove(temp_filepath); print(f"(Incorp) Temp removido: {temp_filepath}")
-                except OSError as oe: print(f"(Incorp) Erro remover temp: {oe}")
-            # NÃO FECHA output_stream aqui
+
+        filename = secure_filename(f"{tool_prefix}{file.filename}")
+        file_stream = io.BytesIO(file.read()) # Lê o arquivo em memória
+        file.close()
+
+        try:
+            print(f"(Formatador Incorporação Rota) Chamando processar_incorporacao_web...")
+            # *** CHAMA A FUNÇÃO CORRETA ***
+            output_stream = processar_incorporacao_web(file_stream) # <<< CHAMA A FUNÇÃO QUE REMOVE LINHAS
+
+            input_basename = filename.replace(f"{tool_prefix}", "").rsplit('.', 1)[0]
+            # Nome do arquivo de saída pode ser o mesmo
+            output_filename = f"planilha_processada_{input_basename}.xlsx"
+            print(f"(Formatador Incorporação Rota) Enviando: {output_filename}")
+
+            return send_file(
+                output_stream,
+                mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                as_attachment=True,
+                download_name=output_filename
+            )
+        except ValueError as ve:
+            flash(f"Erro ao processar: {ve}", 'error'); print(f"(Formatador Incorporação Rota) Erro Validação: {ve}")
+            if file_stream and not file_stream.closed: file_stream.close()
+            if output_stream and not output_stream.closed: output_stream.close()
+            return redirect(url_for('formatador_incorporacao_tool'))
+        except Exception as e:
+            flash(f"Erro inesperado: {e}", 'error'); print(f"(Formatador Incorporação Rota) Erro Inesperado: {e}"); traceback.print_exc()
+            if file_stream and not file_stream.closed: file_stream.close()
+            if output_stream and not output_stream.closed: output_stream.close()
+            return redirect(url_for('formatador_incorporacao_tool'))
+        # Finally não é estritamente necessário aqui pois fechamos os streams no try/except
 
     else: # GET
-        return render_template('formatador_incorporacao.html', active_page='formatador_incorporacao')
+        active_page = 'formatador_incorporacao'
+        return render_template('formatador_incorporacao.html',
+                               active_page=active_page,
+                               ALLOWED_EXTENSIONS={'xlsx', 'xls'})
 
 # === ROTA PARA FORMATADOR LOTE ===
 @app.route('/formatador-lote', methods=['GET', 'POST'])

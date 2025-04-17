@@ -214,7 +214,7 @@ def processar_preco_incorporacao(input_filepath, selected_valor_column_name):
         print(f"(Preço Incorporação) Lidas {len(df_input)} linhas.")
         df_input.columns = df_input.columns.str.strip(); print(f"Colunas: {df_input.columns.tolist()}")
         if selected_valor_column_name not in df_input.columns: raise ValueError(f"Coluna '{selected_valor_column_name}' não encontrada.")
-        print("--- Buscando Cols ---"); col_bloco = find_column_flexible(df_input.columns, ['bloco'], 'BLOCO', required=True); col_apt = find_column_flexible(df_input.columns, ['apt', 'apto', 'apartamento'], 'APT', required=True); col_tipologia = find_column_flexible(df_input.columns, ['tipologia', 'tipo da unidade', 'descricao'], 'TIPOLOGIA', required=True); print("--- Fim Busca ---")
+        print("--- Buscando Cols ---"); col_bloco = find_column_flexible(df_input.columns, ['bloco', 'quadra'], 'BLOCO', required=True); col_apt = find_column_flexible(df_input.columns, ['apt', 'apto', 'apartamento', 'casa'], 'APT', required=True); col_tipologia = find_column_flexible(df_input.columns, ['tipologia', 'tipo da unidade', 'descricao'], 'TIPOLOGIA', required=True); print("--- Fim Busca ---")
         print(f"Aplicando ffill Bloco: '{col_bloco}'"); df_input[col_bloco] = df_input[col_bloco].ffill()
         print(f"Aplicando ffill Tipologia: '{col_tipologia}'"); df_input[col_tipologia] = df_input[col_tipologia].ffill()
         df_output = pd.DataFrame(index=df_input.index)
