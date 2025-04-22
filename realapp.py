@@ -734,7 +734,7 @@ def process_file_sienge():
         df=pd.read_excel(fpath,engine="openpyxl"); df.columns=df.columns.str.upper().str.strip()
         bloco_col="QUADRA" if "QUADRA" in df.columns else "BLOCO" if "BLOCO" in df.columns else None
         apt_col="CASA" if "CASA" in df.columns else "APT" if "APT" in df.columns else None
-        cols_ess=["ETAPA","ÁREA CONSTRUÍDA","FRAÇÃO IDEAL"]
+        cols_ess=["ETAPA","ÁREA CONSTRUIDA","FRAÇÃO IDEAL"]
         if not bloco_col and not apt_col: raise ValueError("Faltando cols ID (QUADRA/BLOCO ou CASA/APT)")
         if bloco_col: cols_ess.append(bloco_col);
         if apt_col: cols_ess.append(apt_col)
@@ -744,7 +744,7 @@ def process_file_sienge():
         df["EMPREENDIMENTO_CODIGO"]=df.apply(map_et_int,axis=1)
         df_out=pd.DataFrame(); df_out['EMPREENDIMENTO']=df['EMPREENDIMENTO_CODIGO']
         df_out['UNIDADE']=df.apply(lambda r: formatar_unidade_sienge(r,bloco_col,apt_col),axis=1)
-        df_out['ÁREA PRIVATIVA']=pd.to_numeric(df['ÁREA CONSTRUÍDA'],errors='coerce').fillna(0)
+        df_out['ÁREA PRIVATIVA']=pd.to_numeric(df['ÁREA CONSTRUIDA'],errors='coerce').fillna(0)
         df_out['ÁREA COMUM']=0; df_out['FRAÇÃO IDEAL']=pd.to_numeric(df['FRAÇÃO IDEAL'],errors='coerce').fillna(0)
         df_out['TIPO DE IMÓVEL']=df.apply(lambda r: determinar_tipo_imovel_sienge(r,apt_col),axis=1)
         df_out['ESTOQUE COMERCIAL']='D'; df_out['ESTOQUE LEGAL']='L'; df_out['ESTOQUE DE OBRA']='C'
