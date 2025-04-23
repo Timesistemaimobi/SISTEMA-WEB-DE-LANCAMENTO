@@ -51,6 +51,75 @@ def format_decimal_br(value, precision):
         return f"{int_part_fmt},{dec_part}"
     except (ValueError, TypeError): return str(value)
 
+# --- Função parse_flexible_float (ADICIONE OU GARANTA QUE ESTÁ IMPORTADA) ---
+def parse_flexible_float(value):
+    """Tenta converter uma string (possivelmente formatada) em um float."""
+    if value is None: return None
+    s_val = str(value).strip()
+    if not s_val: return None
+    # Remove R$, espaços não numéricos, etc. Mantém dígitos, ponto, vírgula, sinal
+    s_val = re.sub(r'[^\d,.-]+', '', s_val)
+    # Tratamento de separadores decimais/milhares
+    num_commas = s_val.count(',')
+    num_dots = s_val.count('.')
+
+    if num_commas == 1 and num_dots >= 1: # Formato PT: 1.234,56 ou 123.456,78
+        # A vírgula é decimal se for o último separador
+        if s_val.rfind(',') > s_val.rfind('.'):
+            s_val = s_val.replace('.', '').replace(',', '.')
+        else: # Formato US: 1,234.56 ou 123,456.78 (ou erro)
+             s_val = s_val.replace(',', '')
+    elif num_commas >= 2 and num_dots == 1: # Formato US com vírgulas: 1,234,567.89
+        s_val = s_val.replace(',', '')
+    elif num_dots >= 2 and num_commas == 1: # Formato PT com pontos: 1.234.567,89
+        s_val = s_val.replace('.', '').replace(',', '.')
+    elif num_commas == 1 and num_dots == 0: # Só vírgula -> decimal
+        s_val = s_val.replace(',', '.')
+    # Se num_dots == 1 e num_commas == 0 -> decimal já é ponto
+    # Se num_dots >= 2 e num_commas == 0 -> erro ou inteiro muito grande (ex: 1.234.567) -> remove pontos
+    elif num_dots >= 2 and num_commas == 0:
+        s_val = s_val.replace('.', '')
+    # Se num_commas >= 2 e num_dots == 0 -> erro ou inteiro com vírgula (ex: 1,234,567) -> remove vírgulas
+    elif num_commas >= 2 and num_dots == 0:
+        s_val = s_val.replace(',', '')
+
+    # Tentativa final de conversão
+    try:
+        return float(s_val)
+    except (ValueError, TypeError):
+        # print(f"Debug parse_flexible_float: Falha ao converter '{value}' -> '{s_val}'") # Debug
+        return None
+
+def format_tipo_with_leading_zero(tipo_str):
+    """
+    Formata a string de TIPO para ter um número com zero à esquerda.
+    Ex: "TIPO 1" -> "TIPO 01", "TIPO 10" -> "TIPO 10", "CASA 5" -> "CASA 05".
+    Retorna a string original se não encontrar um número no final.
+    """
+    original_tipo_str = str(tipo_str).strip() # Garante string e remove espaços
+    if not original_tipo_str:
+        return "" # Retorna vazio se a entrada for vazia
+
+    parts = original_tipo_str.split() # Divide por espaços
+
+    if len(parts) >= 2: # Precisa de pelo menos um prefixo e um número potencial
+        prefix = " ".join(parts[:-1]) # Tudo exceto a última parte é o prefixo
+        number_part = parts[-1]     # A última parte é o número potencial
+
+        try:
+            # Tenta converter a última parte para inteiro
+            number_int = int(number_part)
+            # Formata o número com duas casas decimais (zero à esquerda)
+            formatted_number = f"{number_int:02d}"
+            # Remonta a string
+            return f"{prefix} {formatted_number}"
+        except ValueError:
+            # A última parte não era um número inteiro válido
+            return original_tipo_str # Retorna o original
+    else:
+        # Não tem o formato "PREFIXO NUMERO" (ex: "APARTAMENTO", "TIPO", etc.)
+        return original_tipo_str # Retorna o original
+
 # Função que REMOVE as linhas de cabeçalho Bloco/Quadra
 def processar_incorporacao_web(input_filepath_or_stream):
     """
@@ -122,6 +191,7 @@ def processar_incorporacao_web(input_filepath_or_stream):
         processed_data = [] # Lista para guardar dicionários das linhas de dados
         ultimo_bloco_num_str = None # Para o Formato 1 (se houver linhas antes do header)
         header_saida_bloco_quadra = "BLOCO" # Nome da coluna Bloco/Quadra na SAÍDA
+        final_header_casa_apt = "CASA/APT" # Inicializa com fallback    
 
         print(f"Iterando pelas linhas de dados a partir do índice {header_row_index + 1}...")
         for idx in range(header_row_index + 1, len(df_raw)):
@@ -178,6 +248,8 @@ def processar_incorporacao_web(input_filepath_or_stream):
 
             # Extrai os outros valores usando os índices encontrados
             tipo_val = row.iloc[col_indices['TIPO']] if col_indices.get('TIPO') is not None and len(row) > col_indices['TIPO'] else ''
+
+            formatted_tipo_val = format_tipo_with_leading_zero(tipo_val)
             # CASA/APT já extraído para verificar a linha, pega o valor final formatado
             casa_apt_val_raw = str(row.iloc[casa_apt_idx]).strip()
 
@@ -198,7 +270,7 @@ def processar_incorporacao_web(input_filepath_or_stream):
             # Adiciona dados à lista de saída
             processed_data.append({
                 header_saida_bloco_quadra: ultimo_bloco_num_str, # Número formatado XX do último bloco/quadra válido
-                'TIPO': str(tipo_val).strip(),
+                'TIPO': formatted_tipo_val,
                 final_header_casa_apt: casa_apt_val_raw.replace('.0',''), # Valor da unidade (ex: 1, 2, LT 1)
                 'ÁREA CONSTRUIDA': area_const_val,
                 'QUINTAL': quintal_val,
@@ -247,13 +319,92 @@ def processar_incorporacao_web(input_filepath_or_stream):
         df_final = df_final[colunas_finais_real]
         print(f"Ordem final das colunas: {df_final.columns.tolist()}")
 
-        # 8. Gerar o Arquivo Excel de Saída COM CABEÇALHO
-        print("Gerando arquivo Excel final...")
+          # 8. Gerar o Arquivo Excel e APLICAR PÓS-PROCESSAMENTO <<<<<<<<<<<<<<<<<<<<<<<<<
+        print("Gerando arquivo Excel e aplicando conversão/formatação numérica...")
         output = io.BytesIO()
-        df_final.to_excel(output, index=False, header=True, engine='openpyxl') # header=True
+        with pd.ExcelWriter(output, engine='openpyxl') as writer:
+            df_final.to_excel(writer, index=False, header=True, sheet_name='Incorporacao Formatada')
+
+            workbook = writer.book
+            worksheet = writer.sheets['Incorporacao Formatada']
+
+            # --- INÍCIO DO PÓS-PROCESSAMENTO ---
+            print("Iniciando pós-processamento das células...")
+
+            # Encontra o nome REAL da coluna TIPO no DataFrame FINAL
+            tipo_col_name_final = None
+            for col in df_final.columns:
+                if normalize_text_for_match(col) == 'tipo':
+                    tipo_col_name_final = col
+                    print(f"Coluna 'TIPO' final identificada como: '{tipo_col_name_final}'")
+                    break
+
+            # Define os formatos Excel desejados para as colunas numéricas
+            # Use os NOMES DAS COLUNAS COMO APARECEM NO df_final
+            col_excel_formats = {
+                'ÁREA CONSTRUIDA': '0.00',
+                'QUINTAL': '0.00',
+                'GARAGEM': '0.00', # Assumindo que Garagem é área, se for número de vagas, use '0'
+                'ÁREA PRIVATIVA': '0.00',
+                'FRAÇÃO IDEAL': '0.000000000', # 9 casas decimais
+                # Adicione outros formatos se necessário
+            }
+
+            # Itera pelas células de DADOS
+            for row_idx in range(2, worksheet.max_row + 1):
+                for col_idx_1based in range(1, worksheet.max_column + 1):
+                    cell = worksheet.cell(row=row_idx, column=col_idx_1based)
+                    current_col_name = df_final.columns[col_idx_1based - 1] # Nome da coluna no DF
+
+                    # Pula a coluna TIPO
+                    if tipo_col_name_final and current_col_name == tipo_col_name_final:
+                        # worksheet.cell(row=1, column=col_idx_1based).font = Font(bold=True) # Exemplo: negrito no header
+                        # cell.number_format = '@' # Força formato texto se necessário
+                        continue
+
+                    # Tenta converter para número
+                    original_value = cell.value
+                    if original_value is not None and str(original_value).strip() != '':
+                        numeric_value = parse_flexible_float(original_value)
+
+                        if numeric_value is not None:
+                            # Conseguiu converter: atualiza valor da célula
+                            cell.value = numeric_value
+                            # Aplica formato numérico se definido
+                            if current_col_name in col_excel_formats:
+                                cell.number_format = col_excel_formats[current_col_name]
+                            # else: cell.number_format = 'General' # Opcional: Resetar para Geral
+                        # else: # Não conseguiu converter, mantém como string (valor original)
+                            # cell.number_format = '@' # Opcional: Forçar formato texto
+                            # pass
+                    else:
+                        cell.value = None # Limpa células vazias
+
+            # --- FIM DO PÓS-PROCESSAMENTO ---
+
+            # Ajustar largura das colunas (opcional, mas recomendado)
+            print("Ajustando largura das colunas...")
+            for i, column_name in enumerate(df_final.columns):
+                column_letter = get_column_letter(i + 1)
+                try:
+                    # Lógica simples de largura
+                    max_len_data = 0
+                    # Re-ler a coluna após a conversão para ter melhor ideia do tamanho
+                    # Ou usar a lógica anterior baseada em df_final (antes da conversão na célula)
+                    if column_name in df_final and not df_final[column_name].empty:
+                         # Usar os dados originais (strings) pode ser melhor para a largura visual
+                         max_len_data = df_final[column_name].astype(str).map(len).max()
+
+                    max_len_header = len(str(column_name))
+                    width = max(max_len_data, max_len_header) + 3
+                    worksheet.column_dimensions[column_letter].width = min(width, 60)
+                except Exception as e_width:
+                     print(f"  Aviso: Falha ao ajustar largura da coluna {column_letter} ('{column_name}'): {e_width}")
+                     worksheet.column_dimensions[column_letter].width = 15 # Fallback
+
         output.seek(0)
-        print("(Formatador Incorporação - v5) Arquivo Excel processado gerado.")
+        print("(Formatador Incorporação - v7 Numérico) Arquivo Excel processado gerado.")
         return output
 
-    except ValueError as ve: print(f"(Formatador Incorporação - v5) ERRO VALIDAÇÃO: {ve}"); traceback.print_exc(); raise ve
-    except Exception as e: print(f"(Formatador Incorporação - v5) ERRO INESPERADO: {e}"); traceback.print_exc(); raise RuntimeError(f"Erro inesperado: {e}") from e
+    except ValueError as ve: print(f"(Formatador Incorporação - v7 Numérico) ERRO VALIDAÇÃO: {ve}"); traceback.print_exc(); raise ve
+    except Exception as e: print(f"(Formatador Incorporação - v7 Numérico) ERRO INESPERADO: {e}"); traceback.print_exc(); raise RuntimeError(f"Erro inesperado: {e}") from e
