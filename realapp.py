@@ -8,12 +8,15 @@ import csv
 import openpyxl # Necessário para engine='openpyxl' do pandas
 from openpyxl.utils import get_column_letter
 from openpyxl.styles import Font, Alignment, PatternFill # Para possíveis estilos futuros
+from openpyxl.worksheet.table import Table, TableStyleInfo
 import re # Para limpeza numérica e busca de colunas
 import traceback # Para erros detalhados
 from flask import (
     Flask, render_template, request, redirect, url_for,
     send_file, flash, session, abort
 )
+from collections import defaultdict
+from openpyxl.utils.cell import range_boundaries
 from werkzeug.utils import secure_filename
 from formatadores.tabela_preco_formatador import find_column_flexible, normalize_text_for_match, extract_block_number_safe, parse_flexible_float
 from formatadores.tabela_preco_formatador import processar_tabela_precos_web                            
@@ -28,9 +31,7 @@ from formatadores.incorporacao_formatador import processar_incorporacao_web
 # --- Constantes ---
 TIPOLOGIAS_PADRAO = {
     "51 - 2 quartos sem suíte": "51", "36 - 2 quartos sendo 1 suíte térreo": "36",
-    "34 - 3 quartos sendo 1 suíte térreo": "34",
-    "21 - 2 quartos sendo 1 suíte casa": "21",
-    "20 - 3 quartos sendo 1 suíte casa": "20"
+    "34 - 3 quartos sendo 1 suíte térreo": "34"
 }
 TIPOLOGIAS_SUPERIOR = {
     "52 - 2 quartos sem suíte": "52", "35 - 2 quartos sendo 1 suíte superior": "35",
@@ -38,7 +39,7 @@ TIPOLOGIAS_SUPERIOR = {
 }
 TIPOLOGIAS_PCD = {"50 PCD - 2 QUARTOS SENDO UMA SUÍTE - TÉRREO (PCD)": "50"}
 ENDERECO_FIXO = {
-    "Endereço": "Av. Olívia Flores", "Bairro": "Candeias", "Número": "1265", "Estado": "Bahia",
+    "Endereço": "Av. Olívia Flores", "Bairro": "Candeias", "Número": "1265", "Estado": "BA",
     "Cidade": "Vitória da Conquista", "CEP": "45028610", "Região": "Nordeste",
     "Data da Entrega (Empreendimento)": "01/01/2028"
 }
@@ -90,16 +91,83 @@ def encontrar_coluna_garagem(df_columns):
     for norm_name, orig_name in normalized_columns.items():
         if "garagem" in norm_name: return orig_name
     return None
-def formatar_nome_unidade(row):
-    pcd = " (PCD)" if any('PCD' in normalize_text(str(row.get(c,''))) for c in ['APT','CASA','TIPO']) else ""
-    qd, ca, bl, ap = row.get('QUADRA'), row.get('CASA'), row.get('BLOCO'), row.get('APT')
-    if pd.notna(qd) and pd.notna(ca):
-        try: return f"QD{int(qd):02d} - CASA {int(''.join(filter(str.isdigit, str(ca)))):02d}{pcd}"
-        except: return f"QD{int(qd):02d} - CASA {str(ca).strip()}{pcd}"
-    elif pd.notna(bl) and pd.notna(ap):
-        try: return f"BL{int(bl):02d} - APT {int(''.join(filter(str.isdigit, str(ap)))):02d}{pcd}"
-        except: return f"BL{int(bl):02d} - APT {str(ap).strip()}{pcd}"
-    return ""
+def formatar_nome_unidade(row, bq_col_name, ca_col_name):
+    """
+    Formata o nome da unidade combinando Bloco/Quadra e Casa/Apto.
+    Ex: BL01 - CASA 05, QD10 - APT 101
+    """
+    # Pega os valores das colunas corretas
+    bq_val = row.get(bq_col_name, '')
+    ca_val = row.get(ca_col_name, '')
+
+    # Formata número do Bloco/Quadra com zero à esquerda
+    bq_num_str = "??"
+    bq_prefix = "BL" # Default prefix
+    if pd.notna(bq_val) and str(bq_val).strip():
+        s_bq = str(bq_val).strip()
+        match = re.search(r'\d+', s_bq)
+        if match:
+            try:
+                bq_num_str = f"{int(match.group(0)):02d}"
+            except ValueError:
+                bq_num_str = "??" # Mantém ?? se não for número
+        else:
+             bq_num_str = "??" # Mantém ?? se não achar número
+        # Determina prefixo baseado no NOME da coluna
+        if 'quadra' in str(bq_col_name).lower():
+            bq_prefix = "QD"
+        else:
+            bq_prefix = "BL" # Default para bloco ou outros nomes
+    else:
+        # Caso não encontre valor na coluna Bloco/Quadra
+        print(f"Aviso: Valor não encontrado para Bloco/Quadra na coluna '{bq_col_name}' na linha: {row.name if hasattr(row, 'name') else 'desconhecida'}")
+        # Poderia retornar um erro ou um nome padrão
+        # return "ERRO_BLOCO_QUADRA_AUSENTE"
+
+    # Formata número da Casa/Apto com zero à esquerda
+    ca_num_str = "??"
+    ca_prefix = "UNID" # Default prefix
+    if pd.notna(ca_val) and str(ca_val).strip():
+        s_ca = str(ca_val).strip()
+        # Extrai todos os dígitos
+        digits = ''.join(filter(str.isdigit, s_ca))
+        if digits:
+            try:
+                ca_num_str = f"{int(digits):02d}" # Formata com zero à esquerda
+            except ValueError:
+                ca_num_str = s_ca # Usa a string original se a conversão falhar (improvável)
+        else:
+            ca_num_str = s_ca # Usa a string original se não houver dígitos
+        # Determina prefixo baseado no NOME da coluna
+        if 'casa' in str(ca_col_name).lower():
+            ca_prefix = "CASA"
+        elif 'apt' in str(ca_col_name).lower() or 'apartamento' in str(ca_col_name).lower():
+            ca_prefix = "APT"
+        else:
+            ca_prefix = "UNID" # Default para 'unidade' ou outros nomes
+    else:
+        # Caso não encontre valor na coluna Casa/Apto
+         print(f"Aviso: Valor não encontrado para Casa/Apto na coluna '{ca_col_name}' na linha: {row.name if hasattr(row, 'name') else 'desconhecida'}")
+        # return "ERRO_CASA_APTO_AUSENTE"
+
+
+    # Lógica PCD (mantida)
+    # Verifica TIPO e a coluna original de Casa/Apto para PCD
+    tipo_val_pcd = row.get('TIPO', '') # Assume que TIPO foi encontrada e renomeada
+    pcd = " (PCD)" if any('PCD' in normalize_text(str(v)) for v in [ca_val, tipo_val_pcd]) else ""
+
+    # Combina tudo - Só retorna se ambos os números foram minimamente definidos
+    if bq_num_str != "??" and ca_num_str != "??":
+        return f"{bq_prefix}{bq_num_str} - {ca_prefix} {ca_num_str}{pcd}"
+    elif bq_num_str != "??": # Retorna só o bloco/quadra se a unidade falhou
+         print(f"Aviso: Nome da unidade incompleto (faltou Casa/Apto?) para Bloco/Quadra {bq_prefix}{bq_num_str} na linha {row.name if hasattr(row, 'name') else 'desconhecida'}")
+         return f"{bq_prefix}{bq_num_str}{pcd}" # Adiciona PCD mesmo se incompleto
+    elif ca_num_str != "??": # Retorna só a unidade se o bloco falhou
+        print(f"Aviso: Nome da unidade incompleto (faltou Bloco/Quadra?) para Unidade {ca_prefix} {ca_num_str} na linha {row.name if hasattr(row, 'name') else 'desconhecida'}")
+        return f"{ca_prefix} {ca_num_str}{pcd}"
+    else:
+        print(f"Erro: Não foi possível gerar nome da unidade para linha {row.name if hasattr(row, 'name') else 'desconhecida'}")
+        return "NOME_UNIDADE_INVALIDO" # Ou retorna ""
 def verificar_vaga(g, num_mode):
     if pd.isna(g): return "01 VAGA"
     if num_mode:
@@ -591,7 +659,14 @@ def process_file_cv():
             p,pc,s=request.form.get(f'tipo_{t}_padrao','').strip(), request.form.get(f'tipo_{t}_pcd','').strip(), request.form.get(f'tipo_{t}_superior','').strip() if not is_casa else None
             cp,cpc,cs = TIPOLOGIAS_PADRAO.get(p,p or None), TIPOLOGIAS_PCD.get(pc,pc or None), TIPOLOGIAS_SUPERIOR.get(s,s or None) if s is not None else None
             tip_map[t]={'padrao':cp,'pcd':cpc,'superior':cs}
-        df=pd.read_excel(fpath,engine="openpyxl"); df.columns=df.columns.str.strip()
+        df=pd.read_excel(fpath,engine="openpyxl", dtype=str); # Ler como string inicialmente é mais seguro
+        df.columns=df.columns.str.strip()
+        df = df.fillna('') # Preenche NaN com string vazia
+        print("Procurando colunas Bloco/Quadra e Casa/Apto...")
+        bloco_quadra_col_name = find_column_flexible(df.columns, ['bloco', 'quadra', 'blk', 'qd'], 'Bloco/Quadra', required=True)
+        casa_apto_col_name = find_column_flexible(df.columns, ['casa', 'apto', 'apt', 'apartamento', 'unidade'], 'Casa/Apto', required=True)
+        print(f"Coluna Bloco/Quadra encontrada: '{bloco_quadra_col_name}'")
+        print(f"Coluna Casa/Apto encontrada: '{casa_apto_col_name}'")
         n_cols={normalize_text(c):c for c in df.columns}; t_col=n_cols.get("TIPO")
         if t_col and t_col.upper()!='TIPO': df.rename(columns={t_col:"TIPO"},inplace=True)
         elif "TIPO" not in df.columns: raise ValueError("Coluna TIPO sumiu.")
@@ -603,13 +678,29 @@ def process_file_cv():
         for k,v in ENDERECO_FIXO.items():
             if k in col_map_fix: df[col_map_fix[k]]=v
         df["Matrícula (Empreendimento)"]="XXXXX"; df["Ativo no painel (Empreendimento)"]="Ativo"; df["Nome (Etapa)"]="ETAPA 01"; df["Nome (Bloco)"]="BLOCO 01"; df["Ativo no painel (Unidade)"]="Ativo"
-        df["Nome (Unidade)"]=df.apply(formatar_nome_unidade,axis=1)
+        df["Nome (Unidade)"] = df.apply(
+            lambda r: formatar_nome_unidade(
+                r,
+                bq_col_name=bloco_quadra_col_name,
+                ca_col_name=casa_apto_col_name
+            ),
+            axis=1
+        )
         v_num_mode=basic.get('vaga_por_numero')=='on'
         df["Vagas de garagem (Unidade)"]=df[g_col].apply(lambda x: verificar_vaga(x, v_num_mode)) if g_col else "01 VAGA"
         df["Área de Garagem (Unidade)"]=df[g_col] if g_col else ""
-        q_col=next((c for c in df.columns if normalize_text(c)=='QUINTAL'),None); df["Jardim (Unidade)"]=df[q_col].apply(formatar_jardim) if q_col else ""
-        a_col=next((c for c in df.columns if normalize_text(c)=='AREA CONSTRUIDA'),None); df["Área privativa (Unidade)"]=df[a_col] if a_col else ""
+        quintal_col_name = find_column_flexible(df.columns, ['quintal', 'jardim'], 'Quintal/Jardim', required=False)
+        df["Jardim (Unidade)"]=df[quintal_col_name].apply(formatar_jardim) if quintal_col_name else ""
+        area_const_col_name = find_column_flexible(df.columns, ['areaconstruida', 'área construída', 'area privativa'], 'Área Construída/Privativa', required=False)
+        if area_const_col_name:
+            # Aplica a função de formatação com 2 casas decimais
+            df["Área privativa (Unidade)"] = df[area_const_col_name].apply(lambda x: format_decimal_br(x, precision=2))
+            print(f"Coluna 'Área privativa (Unidade)' criada e formatada a partir de '{area_const_col_name}'.")
+        else:
+            df["Área privativa (Unidade)"] = "" # Define como vazio se a coluna não for encontrada
+            print("Aviso: Coluna de Área Construída/Privativa não encontrada.")
         f_col=next((c for c in df.columns if normalize_text(c)=='FRACAO IDEAL'),None); df["Fração Ideal (Unidade)"]=df[f_col] if f_col else ""
+
         df["Tipo (Unidade)"]=df["TIPO"].astype(str).fillna(''); df["Tipologia (Unidade)"]=df.apply(lambda r: mapear_tipologia_web(r, tip_map, is_casa), axis=1)
         cols_out=["Nome (Empreendimento)","Sigla (Empreendimento)","Matrícula (Empreendimento)","Empresa (Empreendimento)","Tipo (Empreendimento)","Segmento (Empreendimento)","Ativo no painel (Empreendimento)","Região (Empreendimento)","CEP (Empreendimento)","Endereço (Empreendimento)","Bairro (Empreendimento)","Número (Empreendimento)","Estado (Empreendimento)","Cidade (Empreendimento)","Data da Entrega (Empreendimento)","Nome (Etapa)","Nome (Bloco)","Nome (Unidade)","Tipologia (Unidade)","Tipo (Unidade)","Área privativa (Unidade)","Jardim (Unidade)","Área de Garagem (Unidade)","Vagas de garagem (Unidade)","Fração Ideal (Unidade)","Ativo no painel (Unidade)"]
         df_final=df[[c for c in cols_out if c in df.columns]]
