@@ -222,7 +222,7 @@ def processar_incorporacao_web(input_filepath_or_stream):
         if 'QUINTAL' in df_final.columns: cols_to_format_final['QUINTAL'] = 2
         if 'GARAGEM' in df_final.columns: cols_to_format_final['GARAGEM'] = 2
         if 'ÁREA PRIVATIVA' in df_final.columns: cols_to_format_final['ÁREA PRIVATIVA'] = 2
-        if 'FRAÇÃO IDEAL' in df_final.columns: cols_to_format_final['FRAÇÃO IDEAL'] = 5
+        if 'FRAÇÃO IDEAL' in df_final.columns: cols_to_format_final['FRAÇÃO IDEAL'] = 9
         if 'VALOR' in df_final.columns: cols_to_format_final['VALOR'] = 2 # Formata Valor também
 
         for col_name, precision in cols_to_format_final.items():
