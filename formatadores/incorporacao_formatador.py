@@ -163,7 +163,7 @@ def processar_incorporacao_web(input_filepath_or_stream):
             (['casa', 'apt', 'apto', 'apartamento'], 'CASA_APT', True), # Nome conceitual para Unidade
             (['areaconstruida', 'área construída'], 'ÁREA CONSTRUIDA', False),
             (['quintal'], 'QUINTAL', False),
-            (['garagem'], 'GARAGEM', False),
+            (['garagem', 'garagem e frontal'], 'GARAGEM', False),
             (['areaprivativa', 'área privativa'], 'ÁREA PRIVATIVA', False),
             (['fracaoideal', 'fração ideal'], 'FRAÇÃO IDEAL', False),
             (['quadra', 'bloco', 'qd', 'blk'], 'BLOCO_QUADRA', False), # Buscar bloco/quadra no cabeçalho dos dados
