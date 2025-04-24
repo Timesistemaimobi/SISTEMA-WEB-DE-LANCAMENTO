@@ -31,13 +31,15 @@ from formatadores.incorporacao_formatador import processar_incorporacao_web
 # --- Constantes ---
 TIPOLOGIAS_PADRAO = {
     "51 - 2 quartos sem suíte": "51", "36 - 2 quartos sendo 1 suíte térreo": "36",
-    "34 - 3 quartos sendo 1 suíte térreo": "34"
+    "34 - 3 quartos sendo 1 suíte térreo": "34",
+    "21 - 2 quartos sendo 1 suíte casa": "21",
+    "20 - 3 quartos sendo 1 suíte casa": "20"
 }
 TIPOLOGIAS_SUPERIOR = {
     "52 - 2 quartos sem suíte": "52", "35 - 2 quartos sendo 1 suíte superior": "35",
-    "33 - 3 quartos sendo 1 suíte superior": "33"
+    "33 - 3 quartos sendo 1 suíte superior": "33" 
 }
-TIPOLOGIAS_PCD = {"50 PCD - 2 QUARTOS SENDO UMA SUÍTE - TÉRREO (PCD)": "50"}
+TIPOLOGIAS_PCD = {"50 PCD - 2 QUARTOS SENDO UMA SUÍTE - TÉRREO (PCD)": "50"}, {"88 PCD - 2 quartos sendo 1 suíte casa (PCD)": "88"}
 ENDERECO_FIXO = {
     "Endereço": "Av. Olívia Flores", "Bairro": "Candeias", "Número": "1265", "Estado": "BA",
     "Cidade": "Vitória da Conquista", "CEP": "45028610", "Região": "Nordeste",
