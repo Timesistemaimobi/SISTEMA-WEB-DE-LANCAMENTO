@@ -33,15 +33,19 @@ TIPOLOGIAS_PADRAO = {
     "51 - 2 quartos sem suíte": "51", "36 - 2 quartos sendo 1 suíte térreo": "36",
     "34 - 3 quartos sendo 1 suíte térreo": "34",
     "21 - 2 quartos sendo 1 suíte casa": "21",
-    "20 - 3 quartos sendo 1 suíte casa": "20"
+    "20 - 3 quartos sendo 1 suíte casa": "20",
+    "88 PCD - 2 quartos sendo 1 suíte casa (PCD)": "88" 
 }
 TIPOLOGIAS_SUPERIOR = {
     "52 - 2 quartos sem suíte": "52", "35 - 2 quartos sendo 1 suíte superior": "35",
     "33 - 3 quartos sendo 1 suíte superior": "33" 
 }
-TIPOLOGIAS_PCD = {"50 PCD - 2 QUARTOS SENDO UMA SUÍTE - TÉRREO (PCD)": "50"}, {"88 PCD - 2 quartos sendo 1 suíte casa (PCD)": "88"}
+TIPOLOGIAS_PCD = {
+    "50 PCD - 2 QUARTOS SENDO UMA SUÍTE - TÉRREO (PCD)": "50", 
+    "88 PCD - 2 quartos sendo 1 suíte casa (PCD)": "88" 
+}
 ENDERECO_FIXO = {
-    "Endereço": "Av. Olívia Flores", "Bairro": "Candeias", "Número": "1265", "Estado": "BA",
+    "Endereço": "Av. Olívia Flores", "Bairro": "Candeias", "Número": "1265", "Estado": "Bahia",
     "Cidade": "Vitória da Conquista", "CEP": "45028610", "Região": "Nordeste",
     "Data da Entrega (Empreendimento)": "01/01/2028"
 }
@@ -78,6 +82,76 @@ def format_decimal_br(value, precision):
         except (ValueError, TypeError):
             print(f"Aviso format_decimal_br: Não formatou '{value}' com precisão {precision}.")
             return str(value) # Retorna original se tudo falhar
+
+def format_decimal_br_cv(value, precision=2):
+    """
+    Tenta converter valor para float e formata como string com vírgula decimal.
+    Tenta substituir ponto por vírgula mesmo se a conversão falhar,
+    se o valor original parecer um número com ponto.
+    Retorna string vazia para nulos/vazios, ou original em último caso.
+    """
+    if pd.isna(value) or str(value).strip() == '':
+        return ""
+
+    original_str = str(value).strip()
+    numeric_value = parse_flexible_float(original_str) # Tenta converter
+
+    if numeric_value is not None:
+        # CONVERSÃO OK: Formata o número
+        try:
+            format_string = f"{{:.{precision}f}}"
+            # Formata para garantir a precisão correta
+            formatted_num_str = format_string.format(numeric_value)
+            # Substitui o ponto pela vírgula no resultado formatado
+            return formatted_num_str.replace('.', ',')
+        except (ValueError, TypeError):
+            # Erro inesperado na formatação do número já convertido
+            print(f"Aviso format_decimal_br_cv: Falha INESPERADA ao formatar número '{numeric_value}'")
+            # Como último recurso, tenta a substituição no original se tiver ponto
+            if '.' in original_str and ',' not in original_str:
+                # Verifica se parece um número antes de substituir cegamente
+                if re.fullmatch(r'-?\s*\d+(\.\d+)?\s*$', original_str):
+                     print(f"  Fallback format: Substituindo ponto no original '{original_str}' após erro de formatação.")
+                     return original_str.replace('.', ',')
+            return original_str # Retorna original se tudo falhar
+    else:
+        # CONVERSÃO FALHOU: Verifica o formato da string original
+        # Já tem vírgula? Provavelmente já está correto (ou é texto inválido)
+        if ',' in original_str:
+             # Pode ser que já esteja formatado ou seja "1,2,3" - retorna como está
+             return original_str
+        # Não tem vírgula, mas tem ponto? Tenta substituir.
+        elif '.' in original_str:
+             # Verifica se parece um número ANTES de substituir
+             # Permite espaços no início/fim, mas o miolo deve ser numérico com ponto
+             if re.fullmatch(r'-?\s*\d+(\.\d+)?\s*$', original_str):
+                 print(f"Aviso format_decimal_br_cv: Parse falhou para '{original_str}', mas parece numérico com ponto. Substituindo ponto.")
+                 # Tenta formatar para garantir a precisão, se possível (menos provável de funcionar)
+                 try:
+                     num_from_dot = float(original_str)
+                     format_string = f"{{:.{precision}f}}"
+                     formatted_num_str = format_string.format(num_from_dot)
+                     return formatted_num_str.replace('.', ',')
+                 except (ValueError, TypeError):
+                     # Se formatar falhar, apenas substitui o ponto
+                     return original_str.replace('.', ',')
+             else:
+                 # Tem ponto, mas não parece um número (ex: "Texto.com")
+                 return original_str
+        else:
+             # Não tem vírgula nem ponto, conversão falhou (provavelmente inteiro ou texto)
+             # Verifica se é um inteiro para adicionar casas decimais ",00"
+             if original_str.isdigit() or (original_str.startswith('-') and original_str[1:].isdigit()):
+                 try:
+                     num_int = int(original_str)
+                     format_string = f"{{:.{precision}f}}"
+                     formatted_num_str = format_string.format(num_int)
+                     return formatted_num_str.replace('.', ',')
+                 except ValueError:
+                     return original_str # Retorna se não for inteiro válido
+             else:
+                # É apenas texto sem separadores numéricos
+                return original_str # Retorna original
 
 # --- Funções Auxiliares CV ---
 def normalize_text(text):
@@ -688,23 +762,51 @@ def process_file_cv():
             ),
             axis=1
         )
+
+        g_col=encontrar_coluna_garagem(df.columns) # Função auxiliar existente
+        original_garage_col_name = None # Para log
+        if g_col:
+            original_garage_col_name = g_col
+            df.rename(columns={g_col:"GARAGEM_ORIG"},inplace=True)
+            g_col="GARAGEM_ORIG" # Usa o nome renomeado internamente
+            print(f"Coluna de Garagem encontrada como '{original_garage_col_name}' e renomeada para '{g_col}'")
+        else:
+            print("Aviso: Coluna de Garagem não encontrada.")
+            g_col = None # Garante que g_col seja None se não for encontrada
+            
         v_num_mode=basic.get('vaga_por_numero')=='on'
         df["Vagas de garagem (Unidade)"]=df[g_col].apply(lambda x: verificar_vaga(x, v_num_mode)) if g_col else "01 VAGA"
-        df["Área de Garagem (Unidade)"]=df[g_col] if g_col else ""
+        if g_col: # Verifica se a coluna de garagem foi encontrada e renomeada
+            # Aplica a formatação usando a coluna renomeada (GARAGEM_ORIG)
+            df["Área de Garagem (Unidade)"] = df[g_col].apply(lambda x: format_decimal_br_cv(x, precision=2))
+            print(f"Coluna 'Área de Garagem (Unidade)' criada e formatada a partir de '{original_garage_col_name}'.")
+        else:
+            # Se nenhuma coluna de garagem foi encontrada, cria a coluna vazia
+            df["Área de Garagem (Unidade)"] = ""
         quintal_col_name = find_column_flexible(df.columns, ['quintal', 'jardim'], 'Quintal/Jardim', required=False)
         df["Jardim (Unidade)"]=df[quintal_col_name].apply(formatar_jardim) if quintal_col_name else ""
-        area_const_col_name = find_column_flexible(df.columns, ['areaconstruida', 'área construída', 'area privativa'], 'Área Construída/Privativa', required=False)
+        area_const_col_name = find_column_flexible(df.columns, ['areaconstruida', 'área construída'], 'Área Construída/Privativa', required=False)
+        new_area_col_name = "Área privativa m² (Unidade)"
         if area_const_col_name:
             # Aplica a função de formatação com 2 casas decimais
-            df["Área privativa (Unidade)"] = df[area_const_col_name].apply(lambda x: format_decimal_br(x, precision=2))
+            df[new_area_col_name] = df[area_const_col_name].apply(lambda x: format_decimal_br_cv(x, precision=2))
             print(f"Coluna 'Área privativa (Unidade)' criada e formatada a partir de '{area_const_col_name}'.")
         else:
-            df["Área privativa (Unidade)"] = "" # Define como vazio se a coluna não for encontrada
+            df[new_area_col_name] = "" # Define como vazio se a coluna não for encontrada
             print("Aviso: Coluna de Área Construída/Privativa não encontrada.")
-        f_col=next((c for c in df.columns if normalize_text(c)=='FRACAO IDEAL'),None); df["Fração Ideal (Unidade)"]=df[f_col] if f_col else ""
+
+        fracao_col_name = find_column_flexible(df.columns, ['fracaoideal', 'fração ideal'], 'Fração Ideal', required=False)
+        # Agora o IF pode usar a variável fracao_col_name
+        if fracao_col_name:
+             # Aplica a função de formatação com 9 casas decimais (ou quantas precisar)
+            df["Fração Ideal (Unidade)"] = df[fracao_col_name].apply(lambda x: format_decimal_br_cv(x, precision=9))
+            print(f"Coluna 'Fração Ideal (Unidade)' criada e formatada a partir de '{fracao_col_name}'.")
+        else:
+            df["Fração Ideal (Unidade)"] = "" # Define como vazio se não encontrar
+            print("Aviso: Coluna de Fração Ideal não encontrada.")
 
         df["Tipo (Unidade)"]=df["TIPO"].astype(str).fillna(''); df["Tipologia (Unidade)"]=df.apply(lambda r: mapear_tipologia_web(r, tip_map, is_casa), axis=1)
-        cols_out=["Nome (Empreendimento)","Sigla (Empreendimento)","Matrícula (Empreendimento)","Empresa (Empreendimento)","Tipo (Empreendimento)","Segmento (Empreendimento)","Ativo no painel (Empreendimento)","Região (Empreendimento)","CEP (Empreendimento)","Endereço (Empreendimento)","Bairro (Empreendimento)","Número (Empreendimento)","Estado (Empreendimento)","Cidade (Empreendimento)","Data da Entrega (Empreendimento)","Nome (Etapa)","Nome (Bloco)","Nome (Unidade)","Tipologia (Unidade)","Tipo (Unidade)","Área privativa (Unidade)","Jardim (Unidade)","Área de Garagem (Unidade)","Vagas de garagem (Unidade)","Fração Ideal (Unidade)","Ativo no painel (Unidade)"]
+        cols_out=["Nome (Empreendimento)","Sigla (Empreendimento)","Matrícula (Empreendimento)","Empresa (Empreendimento)","Tipo (Empreendimento)","Segmento (Empreendimento)","Ativo no painel (Empreendimento)","Região (Empreendimento)","CEP (Empreendimento)","Endereço (Empreendimento)","Bairro (Empreendimento)","Número (Empreendimento)","Estado (Empreendimento)","Cidade (Empreendimento)","Data da Entrega (Empreendimento)","Nome (Etapa)","Nome (Bloco)","Nome (Unidade)","Tipologia (Unidade)","Tipo (Unidade)","Área privativa m² (Unidade)","Jardim (Unidade)","Área de Garagem (Unidade)","Vagas de garagem (Unidade)","Fração Ideal (Unidade)","Ativo no painel (Unidade)"]
         df_final=df[[c for c in cols_out if c in df.columns]]
         output=io.StringIO(); df_final.to_csv(output,index=False,encoding='utf-8-sig',sep=';',quoting=csv.QUOTE_MINIMAL,decimal=',')
         output.seek(0)
