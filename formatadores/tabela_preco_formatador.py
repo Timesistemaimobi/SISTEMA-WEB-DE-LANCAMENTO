@@ -471,8 +471,8 @@ def processar_tabela_precos_web(input_filepath, block_etapa_mapping):
 
             # Adiciona espaço entre etapas, se não for a última etapa
             if etapa_idx < len(etapas_ordenadas) - 1:
-                final_sheet_data.extend([([None] * num_cols)] * 2) # Duas linhas em branco
-                current_excel_row += 2 # Incrementa pelos espaços adicionados
+                final_sheet_data.append([None] * num_cols) # Duas linhas em branco
+                current_excel_row += 1 # Incrementa pelos espaços adicionados
 
         # 6. Escrever no Excel e Aplicar Estilos Visuais
         output = io.BytesIO()
