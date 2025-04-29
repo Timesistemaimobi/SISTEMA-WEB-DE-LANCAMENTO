@@ -348,24 +348,76 @@ def determinar_tipo_imovel_sienge(row, apt_col):
     elif apt_col=="CASA": return "CASA";
     else: return "INDEFINIDO"
 def formatar_unidade_sienge(row, bloco_coluna_nome, apt_coluna_nome):
-    bloco_str = "00"; apt_str = "00"; bloco_prefix = "??"; apt_prefix = "??"
+    """
+    Formata a unidade para o padrão SIENGE (ex: QD01 - CASA 01, BL01 - APT 01).
+    Determina o prefixo (QD/BL) baseado no nome da coluna bloco_coluna_nome.
+    """
+    bloco_str = "00"
+    apt_str = "00"
+    bloco_prefix = "??" # Default/fallback
+    apt_prefix = "??"   # Default/fallback
+
     try:
+        # --- Processa Bloco/Quadra ---
         if bloco_coluna_nome and pd.notna(row.get(bloco_coluna_nome)):
-            bloco_val = row[bloco_coluna_nome]; bpt = str(bloco_coluna_nome)[:2] if len(str(bloco_coluna_nome)) >= 2 else "??"; bloco_prefix = ''.join(filter(str.isalpha, bpt)).upper() or "??"
-            try: bloco_int = int(float(bloco_val)); bloco_str = f"{bloco_int:02d}"
-            except: bloco_str = str(bloco_val).strip()
+            bloco_val = row[bloco_coluna_nome]
+
+            # --- LÓGICA CORRIGIDA PARA O PREFIXO ---
+            # Verifica se o NOME da coluna contém 'QUADRA' (ignorando case)
+            if 'QUADRA' in str(bloco_coluna_nome).upper():
+                bloco_prefix = "QD"
+            else: # Assume que é Bloco ou usa BL como padrão
+                bloco_prefix = "BL"
+            # --- FIM DA LÓGICA CORRIGIDA ---
+
+            # Formata a parte numérica do VALOR do Bloco/Quadra
+            try:
+                # Tenta converter via float primeiro para lidar com "1.0" etc.
+                bloco_int = int(float(bloco_val))
+                bloco_str = f"{bloco_int:02d}" # Formata com zero à esquerda
+            except (ValueError, TypeError):
+                # Se a conversão falhar, usa o valor original (removendo espaços)
+                bloco_str = str(bloco_val).strip()
+                print(f"Aviso SIENGE L{row.name if hasattr(row,'name') else 'Unk'}: Não converteu valor Bloco/Quadra '{bloco_val}' para número. Usando original: '{bloco_str}'")
+
+        # --- Processa Apartamento/Casa (Mantém lógica anterior) ---
         if apt_coluna_nome and pd.notna(row.get(apt_coluna_nome)):
-            apt_val = row[apt_coluna_nome]; apt_prefix = str(apt_coluna_nome).upper()
+            apt_val = row[apt_coluna_nome]
+            # Deriva o prefixo do NOME da coluna de apt/casa
+            apt_prefix = str(apt_coluna_nome).upper() # Ex: "CASA", "APT"
+
+            # Extrai e formata a parte numérica do VALOR do apt/casa
             apt_num_str = ''.join(filter(str.isdigit, str(apt_val)))
             if apt_num_str:
-                try: apt_int = int(apt_num_str); apt_str = f"{apt_int:02d}"
-                except ValueError: apt_str = apt_num_str
-            else: apt_str = "S/N"; print(f"Aviso SIENGE L{row.name if hasattr(row,'name') else 'Unk'}: Não extraiu número de '{apt_val}' em {apt_coluna_nome}")
-        if bloco_coluna_nome and apt_coluna_nome: return f"{bloco_prefix}{bloco_str} - {apt_prefix} {apt_str}"
-        elif bloco_coluna_nome: return f"{bloco_prefix}{bloco_str}";
-        elif apt_coluna_nome: return f"{apt_prefix} {apt_str}";
-        else: return "N/D"
-    except Exception as e: print(f"(SIENGE) Erro formatar unidade: {e}"); return "ERRO_FORMAT"
+                try:
+                    apt_int = int(apt_num_str)
+                    apt_str = f"{apt_int:02d}" # Formata com zero à esquerda
+                except ValueError:
+                    # Caso raro após filtrar dígitos
+                    apt_str = apt_num_str
+            else:
+                # Se não encontrar dígitos (ex: valor é "GARAGEM")
+                apt_str = str(apt_val).strip() # Usa o valor original
+                # Considerar se "S/N" seria melhor aqui ou o valor original
+                # apt_str = "S/N"
+                print(f"Aviso SIENGE L{row.name if hasattr(row,'name') else 'Unk'}: Não extraiu número de '{apt_val}' em {apt_coluna_nome}. Usando original: '{apt_str}'")
+
+        # --- Combina as partes (Mantém lógica anterior) ---
+        # Verifica se ambos os prefixos foram definidos (não são mais "??")
+        if bloco_coluna_nome and apt_coluna_nome and bloco_prefix != "??" and apt_prefix != "??":
+            return f"{bloco_prefix}{bloco_str} - {apt_prefix} {apt_str}"
+        elif bloco_coluna_nome and bloco_prefix != "??":
+            return f"{bloco_prefix}{bloco_str}" # Retorna só Bloco/Quadra se apt falhar
+        elif apt_coluna_nome and apt_prefix != "??":
+            return f"{apt_prefix} {apt_str}" # Retorna só Apt/Casa se bloco falhar
+        else:
+            return "N/D" # Caso nenhum seja encontrado/processado
+
+    except Exception as e:
+        print(f"(SIENGE) Erro formatar unidade: {e}")
+        import traceback
+        traceback.print_exc() # Ajuda a depurar erros inesperados
+        return "ERRO_FORMAT"
 
 # --- Funções Auxiliares SIENGE Lote ---
 def normalize_column_name_sienge_lote(c):
