@@ -123,288 +123,296 @@ def format_tipo_with_leading_zero(tipo_str):
 # Função que REMOVE as linhas de cabeçalho Bloco/Quadra
 def processar_incorporacao_web(input_filepath_or_stream):
     """
-    Processa planilha de incorporação, detectando a linha do cabeçalho,
-    extrai dados com base nela, remove linhas de título, formata números,
-    e retorna BytesIO do Excel formatado.
+    Processa planilha de incorporação... Adiciona (PCD) à unidade se aplicável
+    verificando TIPO ou CASA/APT.
     """
-    print(f"(Formatador Incorporação - v6 Detecção Header) Iniciando.")
+    print(f"(Formatador Incorporação - v11 PCD Unidade - TIPO ou UNID) Iniciando.")
     output = io.BytesIO()
     try:
-        # 1. Leitura Bruta Inicial
+        # 1. Leitura Bruta Inicial (MANTENHA)
+        # ...
         print(f"Lendo arquivo/stream...")
-        df_raw = pd.read_excel(input_filepath_or_stream, header=None, dtype=str).fillna('') # Preenche NaN com ''
+        df_raw = pd.read_excel(input_filepath_or_stream, header=None, dtype=str).fillna('')
         print(f"Lidas {len(df_raw)} linhas brutas.")
         if df_raw.empty: raise ValueError("Arquivo Excel está vazio.")
 
-        # 2. Detectar a Linha do Cabeçalho Real
+        # 2. Detectar a Linha do Cabeçalho Real (MANTENHA)
+        # ...
         header_row_index = -1
-        # Palavras-chave para identificar o cabeçalho dos DADOS
         possible_headers_data = ['tipo', 'casa', 'apt', 'apto', 'areaconstruida', 'area', 'fracaoideal', 'valor']
         print("Tentando detectar a linha do cabeçalho dos dados...")
-        # Procura nas primeiras 15 linhas (pode ajustar conforme necessário)
         for idx, row in df_raw.head(15).iterrows():
             row_values_norm = [normalize_text_for_match(str(v)) for v in row.values if pd.notna(v)]
-            # Exige pelo menos 3 matches das keywords esperadas no cabeçalho dos dados
             if sum(h in row_values_norm for h in possible_headers_data) >= 3:
                 header_row_index = idx
                 print(f"Linha do cabeçalho dos dados encontrada no índice: {header_row_index} (Linha Excel: {header_row_index + 1})")
                 break
         if header_row_index == -1:
-            raise ValueError("Não foi possível encontrar a linha do cabeçalho dos dados (procurando por TIPO, CASA/APT, ÁREA CONSTRUIDA, FRAÇÃO IDEAL, VALOR, etc. nas primeiras 15 linhas).")
+            raise ValueError("Não foi possível encontrar a linha do cabeçalho dos dados.")
 
-        # 3. Identificar os Índices das Colunas Chave usando a linha do Cabeçalho Detectado
+
+        # 3. Identificar os Índices das Colunas Chave (MANTENHA)
+        # ...
         header_data_row_values = df_raw.iloc[header_row_index].fillna('').astype(str).str.strip()
         print(f"Valores do cabeçalho detectado: {header_data_row_values.tolist()}")
-
-        # Mapeia keywords para os índices reais no cabeçalho detectado
-        # Cria uma lista de tuplas (keyword, nome_conceito, required)
         concept_mappings = [
             (['tipo'], 'TIPO', True),
-            (['casa', 'apt', 'apto', 'apartamento'], 'CASA_APT', True), # Nome conceitual para Unidade
+            (['casa', 'apt', 'apto', 'apartamento'], 'CASA_APT', True),
             (['areaconstruida', 'área construída'], 'ÁREA CONSTRUIDA', False),
             (['quintal'], 'QUINTAL', False),
             (['garagem', 'garagem e frontal'], 'GARAGEM', False),
             (['areaprivativa', 'área privativa'], 'ÁREA PRIVATIVA', False),
             (['fracaoideal', 'fração ideal'], 'FRAÇÃO IDEAL', False),
-            (['quadra', 'bloco', 'qd', 'blk'], 'BLOCO_QUADRA', False), # Buscar bloco/quadra no cabeçalho dos dados
-            (['valor', 'preco'], 'VALOR', False), # Buscar valor no cabeçalho dos dados
+            (['quadra', 'bloco', 'qd', 'blk'], 'BLOCO_QUADRA', False)
         ]
-
-        # Mapeia nome conceitual -> índice real no DF (None se não encontrado)
         col_indices = {}
         print("--- Identificando índices das colunas chave no cabeçalho ---")
         for keywords, concept_name, required in concept_mappings:
             found_idx = None
-            # Procura pela keyword normalizada nos valores do cabeçalho detectado
             for real_idx, header_val_str in header_data_row_values.items():
                 if pd.notna(header_val_str) and normalize_text_for_match(header_val_str) in [normalize_text_for_match(k) for k in keywords]:
                     found_idx = real_idx
                     print(f"  -> Coluna '{concept_name}' encontrada no índice: {found_idx} (Header: '{header_val_str}')")
-                    break # Pega o primeiro match
+                    break
             if found_idx is None and required:
                  raise ValueError(f"Coluna obrigatória '{concept_name}' não encontrada no cabeçalho detectado ({header_row_index+1}). Keywords: {keywords}")
-            col_indices[concept_name] = found_idx # Armazena o índice (ou None)
+            col_indices[concept_name] = found_idx
         print("--- Índices das colunas chave: ---", col_indices)
         print("-----------------------------------")
 
-        # 4. Iterar pelas linhas ABAIXO do cabeçalho e Extrair Dados
-        processed_data = [] # Lista para guardar dicionários das linhas de dados
-        ultimo_bloco_num_str = None # Para o Formato 1 (se houver linhas antes do header)
-        header_saida_bloco_quadra = "BLOCO" # Nome da coluna Bloco/Quadra na SAÍDA
-        final_header_casa_apt = "CASA/APT" # Inicializa com fallback    
+
+        # 4. Iterar pelas linhas ABAIXO do cabeçalho e Extrair Dados (MODIFICAÇÕES AQUI)
+        processed_data = []
+        ultimo_bloco_num_str = None
+        header_saida_bloco_quadra = "BLOCO"
+        final_header_casa_apt = "UNIDADE" # Alterado fallback para UNIDADE
 
         print(f"Iterando pelas linhas de dados a partir do índice {header_row_index + 1}...")
         for idx in range(header_row_index + 1, len(df_raw)):
-            row = df_raw.iloc[idx].fillna('') # Pega a linha e preenche NaN com ''
+            row = df_raw.iloc[idx].fillna('')
 
-            # 4.1. Verificar se é uma linha de título de seção (QUADRA/BLOCO)
-            # Verificar a primeira célula
+            # 4.1. Tratar linhas de título (MANTENHA)
+            # ...
             cell_val_a = str(row.iloc[0]).strip()
             is_quadra_title_line = cell_val_a.lower().startswith("quadra")
             is_bloco_title_line = cell_val_a.lower().startswith("bloco")
 
             if is_quadra_title_line or is_bloco_title_line:
-                 # É uma linha de título de seção -> Extrair número e definir prefixo de SAÍDA
                 if is_quadra_title_line: header_saida_bloco_quadra = "QUADRA"
                 else: header_saida_bloco_quadra = "BLOCO"
                 match = re.search(r'\d+', cell_val_a)
-                if match: # <<< ADICIONADO if match:
-                    try:
-                        ultimo_bloco_num_str = f"{int(match.group(0)):02d}" # Usa group(0) ou group(1)? Regex r'\d+' só tem grupo 0
-                    except (ValueError, TypeError, IndexError): # Captura mais erros potenciais
-                        print(f"  Aviso Linha {idx}: Não pôde converter número de '{cell_val_a}'.")
-                        ultimo_bloco_num_str = "??" # Ou None, se preferir
-                else: # <<< ADICIONADO else:
-                    print(f"  Aviso Linha {idx}: Nenhum dígito encontrado em '{cell_val_a}'.")
-                    ultimo_bloco_num_str = "??" # Ou None
+                if match:
+                    try: ultimo_bloco_num_str = f"{int(match.group(0)):02d}"
+                    except (ValueError, TypeError, IndexError): ultimo_bloco_num_str = "??"
+                else: ultimo_bloco_num_str = "??"
+                print(f"  Linha {idx}: Título de Seção '{cell_val_a}'. Número = {ultimo_bloco_num_str}. Nome Col Saída = {header_saida_bloco_quadra}")
+                continue
 
-                    print(f"  Linha {idx}: Título de Seção '{cell_val_a}'. Número = {ultimo_bloco_num_str}. Nome Col Saída = {header_saida_bloco_quadra}")
-
-                    continue
-            # 4.2. Tentar extrair dados pelas colunas chave encontradas (se os índices existem)
-            # Verifica se tem um valor na coluna CASA/APT (índice detectado)
+            # 4.2. Verificar se é linha de dados válida (MANTENHA)
+            # ...
             casa_apt_idx = col_indices.get('CASA_APT')
             if casa_apt_idx is None or len(row) <= casa_apt_idx or str(row.iloc[casa_apt_idx]).strip() == '':
-                 # Se não tem CASA/APT na coluna esperada, PULA esta linha (não é linha de dados)
-                 # print(f"  Linha {idx}: Não tem valor na coluna CASA/APT ({casa_apt_idx}). Ignorando.") # Debug
                  continue
 
-            # Esta linha é de dados válidos (tem CASA/APT)
-            # Verifica se a coluna BLOCO_QUADRA foi encontrada no cabeçalho
+            # 4.3. Tratar bloco/quadra da linha de dados (MANTENHA)
+            # ...
             bloco_quadra_idx = col_indices.get('BLOCO_QUADRA')
             if bloco_quadra_idx is not None and len(row) > bloco_quadra_idx and str(row.iloc[bloco_quadra_idx]).strip():
-                 # Se a coluna QUADRA/BLOCO existe nos dados E tem um valor nesta linha
-                 # Usa este valor para o bloco (Formato 2)
                  bloco_val_raw = str(row.iloc[bloco_quadra_idx]).strip()
                  match = re.search(r'\d+', bloco_val_raw)
                  bloco_num_str_atual = f"{int(match.group(0)):02d}" if match else "??"
-                 ultimo_bloco_num_str = bloco_num_str_atual # Atualiza o último encontrado
-                 # Nome da coluna de saída já foi definido pelo último título de seção encontrado
+                 ultimo_bloco_num_str = bloco_num_str_atual
 
-            # Verifica se temos um bloco associado (seja do título de seção ou da coluna de dados)
             if ultimo_bloco_num_str is None:
-                 print(f"  Linha {idx}: Linha de dados encontrada sem Bloco/Quadra associado. Ignorando.")
-                 continue # Pula linhas de dados sem bloco
+                 continue
 
-            # Extrai os outros valores usando os índices encontrados
-            tipo_val = row.iloc[col_indices['TIPO']] if col_indices.get('TIPO') is not None and len(row) > col_indices['TIPO'] else ''
+            # --- Extração dos valores ---
+            # Pega o valor ORIGINAL da coluna TIPO para verificação PCD
+            tipo_val_original = str(row.iloc[col_indices['TIPO']]) if col_indices.get('TIPO') is not None and len(row) > col_indices['TIPO'] else ''
+            # Pega o valor ORIGINAL da coluna CASA/APT para verificação PCD e para formatação do número
+            casa_apt_val_original = str(row.iloc[casa_apt_idx]).strip()
 
-            formatted_tipo_val = format_tipo_with_leading_zero(tipo_val)
-            # CASA/APT já extraído para verificar a linha, pega o valor final formatado
-            casa_apt_val_raw = str(row.iloc[casa_apt_idx]).strip()
+            # Formata o TIPO para a coluna de saída TIPO (ex: TIPO 01)
+            formatted_tipo_output_val = format_tipo_with_leading_zero(tipo_val_original)
 
+            # --- MODIFICAÇÃO: Determinar se é PCD verificando TIPO OU CASA/APT ---
+            is_special_unit = False
+            normalized_tipo = normalize_text_for_match(tipo_val_original)
+            normalized_unidade = normalize_text_for_match(casa_apt_val_original)
+
+            if 'pcd' in normalized_tipo or 'pne' in normalized_tipo:
+                is_special_unit = True
+            elif 'pcd' in normalized_unidade or 'pne' in normalized_unidade:
+                is_special_unit = True
+            # --- FIM DA MODIFICAÇÃO PCD ---
+
+            # Formata o número da unidade (CASA/APT)
+            # Extrai apenas os dígitos do valor original da unidade para formatação do número
+            unit_number_digits = ''.join(filter(str.isdigit, casa_apt_val_original))
+            if unit_number_digits:
+                try:
+                    formatted_unit_number_part = f"{int(unit_number_digits):02d}"
+                except ValueError:
+                    formatted_unit_number_part = casa_apt_val_original # Fallback
+            else:
+                formatted_unit_number_part = casa_apt_val_original # Se não houver dígitos, usa o valor original
+
+            # Adiciona (PCD) ao número formatado da unidade se aplicável
+            if is_special_unit:
+                formatted_unit_number_with_pcd = f"{formatted_unit_number_part} (PCD)"
+            else:
+                formatted_unit_number_with_pcd = formatted_unit_number_part
+
+            # Outras colunas
             area_const_val = row.iloc[col_indices['ÁREA CONSTRUIDA']] if col_indices.get('ÁREA CONSTRUIDA') is not None and len(row) > col_indices['ÁREA CONSTRUIDA'] else ''
             quintal_val = row.iloc[col_indices['QUINTAL']] if col_indices.get('QUINTAL') is not None and len(row) > col_indices['QUINTAL'] else ''
             garagem_val = row.iloc[col_indices['GARAGEM']] if col_indices.get('GARAGEM') is not None and len(row) > col_indices['GARAGEM'] else ''
             area_priv_val = row.iloc[col_indices['ÁREA PRIVATIVA']] if col_indices.get('ÁREA PRIVATIVA') is not None and len(row) > col_indices['ÁREA PRIVATIVA'] else ''
             fracao_val = row.iloc[col_indices['FRAÇÃO IDEAL']] if col_indices.get('FRAÇÃO IDEAL') is not None and len(row) > col_indices['FRAÇÃO IDEAL'] else ''
-            valor_val = row.iloc[col_indices['VALOR']] if col_indices.get('VALOR') is not None and len(row) > col_indices['VALOR'] else ''
 
-            # Determina nome da coluna CASA/APT para o cabeçalho final
-            # Pega o nome original do cabeçalho detectado
-            header_casa_apt_orig_val = header_data_row_values.iloc[casa_apt_idx] if casa_apt_idx is not None else ''
-            if 'casa' in normalize_text_for_match(str(header_casa_apt_orig_val)): final_header_casa_apt = "CASA"
-            elif 'apt' in normalize_text_for_match(str(header_casa_apt_orig_val)): final_header_casa_apt = "APT"
-            else: final_header_casa_apt = "CASA/APT" # Fallback
 
-            # Adiciona dados à lista de saída
+            # Determina nome do cabeçalho CASA/APT para a coluna de saída
+            header_casa_apt_orig_val_from_header = header_data_row_values.iloc[casa_apt_idx] if casa_apt_idx is not None else ''
+            if 'casa' in normalize_text_for_match(str(header_casa_apt_orig_val_from_header)):
+                final_header_casa_apt = "CASA"
+            elif 'apt' in normalize_text_for_match(str(header_casa_apt_orig_val_from_header)) or \
+                 'apartamento' in normalize_text_for_match(str(header_casa_apt_orig_val_from_header)):
+                final_header_casa_apt = "APT"
+            else:
+                final_header_casa_apt = "UNIDADE" # Fallback se não for explicitamente casa ou apt
+
+            # --- Adiciona dados à lista ---
             processed_data.append({
-                header_saida_bloco_quadra: ultimo_bloco_num_str, # Número formatado XX do último bloco/quadra válido
-                'TIPO': formatted_tipo_val,
-                final_header_casa_apt: casa_apt_val_raw.replace('.0',''), # Valor da unidade (ex: 1, 2, LT 1)
+                header_saida_bloco_quadra: ultimo_bloco_num_str,
+                'TIPO': formatted_tipo_output_val, # TIPO formatado (ex: TIPO 01) para a coluna TIPO
+                final_header_casa_apt: formatted_unit_number_with_pcd, # Valor da unidade com (PCD) se aplicável
                 'ÁREA CONSTRUIDA': area_const_val,
                 'QUINTAL': quintal_val,
                 'GARAGEM': garagem_val,
                 'ÁREA PRIVATIVA': area_priv_val,
                 'FRAÇÃO IDEAL': fracao_val,
-                'ETAPA': '01', # ETAPA fixa
-                'VALOR': valor_val # Mantém valor como está por enquanto
+                'ETAPA': '01',
             })
 
         print(f"Iteração concluída. {len(processed_data)} linhas de dados extraídas.")
         if not processed_data: raise ValueError("Nenhum dado válido extraído.")
 
-        # 5. Criar DataFrame Final a partir dos dados processados
+        # 5. Criar DataFrame Final (MANTENHA)
         df_final = pd.DataFrame(processed_data)
 
-        # 6. Aplicar Formatação Numérica
-        print("--- Formatando Colunas Numéricas ---")
+        # 6. Aplicar Formatação Numérica para exibição string (MANTENHA)
+        #    (Se precisar de números reais no Excel, o pós-processamento openpyxl é crucial)
+        print("--- Formatando Colunas Numéricas (para exibição no CSV/string) ---")
         cols_to_format_final = {}
         if 'ÁREA CONSTRUIDA' in df_final.columns: cols_to_format_final['ÁREA CONSTRUIDA'] = 2
         if 'QUINTAL' in df_final.columns: cols_to_format_final['QUINTAL'] = 2
         if 'GARAGEM' in df_final.columns: cols_to_format_final['GARAGEM'] = 2
         if 'ÁREA PRIVATIVA' in df_final.columns: cols_to_format_final['ÁREA PRIVATIVA'] = 2
         if 'FRAÇÃO IDEAL' in df_final.columns: cols_to_format_final['FRAÇÃO IDEAL'] = 9
-        if 'VALOR' in df_final.columns: cols_to_format_final['VALOR'] = 2 # Formata Valor também
+        if 'VALOR' in df_final.columns: cols_to_format_final['VALOR'] = 2
 
         for col_name, precision in cols_to_format_final.items():
             if col_name in df_final.columns:
                 print(f"Formatando coluna '{col_name}' com precisão {precision}...")
+                # Garante que está aplicando a formatação correta
                 df_final[col_name] = df_final[col_name].apply(lambda x: format_decimal_br(x, precision))
             else: print(f"Aviso: Coluna '{col_name}' para formatar não encontrada.")
 
 
-        # 7. Definir Ordem Final das Colunas
+        # 7. Definir Ordem Final das Colunas (MANTENHA)
+        # ...
         ordem_saida = [
             header_saida_bloco_quadra, 'TIPO', final_header_casa_apt,
             'ÁREA CONSTRUIDA', 'QUINTAL', 'GARAGEM', 'ÁREA PRIVATIVA', 'FRAÇÃO IDEAL',
-            'ETAPA' # Adiciona valor e etapa no final
+            'ETAPA'
         ]
-        # Remove duplicatas e mantém a ordem
         colunas_finais_real = []
         for col in ordem_saida:
             if col in df_final.columns and col not in colunas_finais_real:
                 colunas_finais_real.append(col)
-
+        # Adiciona colunas não previstas na ordem ao final (segurança)
+        for col in df_final.columns:
+            if col not in colunas_finais_real:
+                print(f"Aviso: Coluna '{col}' não prevista na ordem de saída, adicionando ao final.")
+                colunas_finais_real.append(col)
         df_final = df_final[colunas_finais_real]
         print(f"Ordem final das colunas: {df_final.columns.tolist()}")
 
-          # 8. Gerar o Arquivo Excel e APLICAR PÓS-PROCESSAMENTO <<<<<<<<<<<<<<<<<<<<<<<<<
+
+        # 8. Gerar o Arquivo Excel e APLICAR PÓS-PROCESSAMENTO com openpyxl (MANTENHA)
+        #    (Este bloco é crucial para ter números reais no Excel e aplicar formatos visuais)
         print("Gerando arquivo Excel e aplicando conversão/formatação numérica...")
         output = io.BytesIO()
         with pd.ExcelWriter(output, engine='openpyxl') as writer:
             df_final.to_excel(writer, index=False, header=True, sheet_name='Incorporacao Formatada')
-
             workbook = writer.book
             worksheet = writer.sheets['Incorporacao Formatada']
-
-            # --- INÍCIO DO PÓS-PROCESSAMENTO ---
             print("Iniciando pós-processamento das células...")
-
-            # Encontra o nome REAL da coluna TIPO no DataFrame FINAL
             tipo_col_name_final = None
+            casa_apt_col_name_final = final_header_casa_apt # Pega o nome da coluna da unidade da lógica anterior
+
             for col in df_final.columns:
                 if normalize_text_for_match(col) == 'tipo':
                     tipo_col_name_final = col
                     print(f"Coluna 'TIPO' final identificada como: '{tipo_col_name_final}'")
-                    break
+                    break # Só precisa encontrar uma vez
 
-            # Define os formatos Excel desejados para as colunas numéricas
-            # Use os NOMES DAS COLUNAS COMO APARECEM NO df_final
             col_excel_formats = {
-                'ÁREA CONSTRUIDA': '0.00',
-                'QUINTAL': '0.00',
-                'GARAGEM': '0.00', # Assumindo que Garagem é área, se for número de vagas, use '0'
-                'ÁREA PRIVATIVA': '0.00',
-                'FRAÇÃO IDEAL': '0.000000000', # 9 casas decimais
-                # Adicione outros formatos se necessário
+                'ÁREA CONSTRUIDA': '0.00', 'QUINTAL': '0.00', 'GARAGEM': '0.00',
+                'ÁREA PRIVATIVA': '0.00', 'FRAÇÃO IDEAL': '0.000000000',
+                'VALOR': '#,##0.00' # Formato para VALOR
             }
 
-            # Itera pelas células de DADOS
             for row_idx in range(2, worksheet.max_row + 1):
                 for col_idx_1based in range(1, worksheet.max_column + 1):
                     cell = worksheet.cell(row=row_idx, column=col_idx_1based)
-                    current_col_name = df_final.columns[col_idx_1based - 1] # Nome da coluna no DF
+                    current_col_name = df_final.columns[col_idx_1based - 1]
 
-                    # Pula a coluna TIPO
-                    if tipo_col_name_final and current_col_name == tipo_col_name_final:
-                        # worksheet.cell(row=1, column=col_idx_1based).font = Font(bold=True) # Exemplo: negrito no header
-                        # cell.number_format = '@' # Força formato texto se necessário
+                    # Pula colunas que devem ser texto por padrão (TIPO, e a coluna da UNIDADE)
+                    if (tipo_col_name_final and current_col_name == tipo_col_name_final) or \
+                       (casa_apt_col_name_final and current_col_name == casa_apt_col_name_final):
+                        if isinstance(cell.value, str) and cell.value.startswith(('=', '+', '-', '@')):
+                             cell.value = "'" + cell.value
+                             cell.number_format = '@'
                         continue
 
-                    # Tenta converter para número
                     original_value = cell.value
+                    numeric_value = None
                     if original_value is not None and str(original_value).strip() != '':
                         numeric_value = parse_flexible_float(original_value)
 
-                        if numeric_value is not None:
-                            # Conseguiu converter: atualiza valor da célula
-                            cell.value = numeric_value
-                            # Aplica formato numérico se definido
-                            if current_col_name in col_excel_formats:
-                                cell.number_format = col_excel_formats[current_col_name]
-                            # else: cell.number_format = 'General' # Opcional: Resetar para Geral
-                        # else: # Não conseguiu converter, mantém como string (valor original)
-                            # cell.number_format = '@' # Opcional: Forçar formato texto
-                            # pass
+                    if numeric_value is not None:
+                        cell.value = numeric_value
+                        if current_col_name in col_excel_formats:
+                            cell.number_format = col_excel_formats[current_col_name]
                     else:
-                        cell.value = None # Limpa células vazias
+                        if isinstance(original_value, str):
+                            original_value_str = original_value.strip()
+                            if original_value_str.startswith(('=', '+', '-', '@')):
+                                cell.value = "'" + original_value_str
+                                cell.number_format = '@'
+                        elif original_value is None or str(original_value).strip() == '':
+                             cell.value = None
 
-            # --- FIM DO PÓS-PROCESSAMENTO ---
-
-            # Ajustar largura das colunas (opcional, mas recomendado)
             print("Ajustando largura das colunas...")
+            # ... (código de ajuste de largura - MANTENHA) ...
             for i, column_name in enumerate(df_final.columns):
                 column_letter = get_column_letter(i + 1)
                 try:
-                    # Lógica simples de largura
                     max_len_data = 0
-                    # Re-ler a coluna após a conversão para ter melhor ideia do tamanho
-                    # Ou usar a lógica anterior baseada em df_final (antes da conversão na célula)
                     if column_name in df_final and not df_final[column_name].empty:
-                         # Usar os dados originais (strings) pode ser melhor para a largura visual
                          max_len_data = df_final[column_name].astype(str).map(len).max()
-
                     max_len_header = len(str(column_name))
                     width = max(max_len_data, max_len_header) + 3
                     worksheet.column_dimensions[column_letter].width = min(width, 60)
                 except Exception as e_width:
                      print(f"  Aviso: Falha ao ajustar largura da coluna {column_letter} ('{column_name}'): {e_width}")
-                     worksheet.column_dimensions[column_letter].width = 15 # Fallback
+                     worksheet.column_dimensions[column_letter].width = 15
+
 
         output.seek(0)
-        print("(Formatador Incorporação - v7 Numérico) Arquivo Excel processado gerado.")
+        print("(Formatador Incorporação - v11 PCD) Arquivo Excel processado gerado.")
         return output
 
-    except ValueError as ve: print(f"(Formatador Incorporação - v7 Numérico) ERRO VALIDAÇÃO: {ve}"); traceback.print_exc(); raise ve
-    except Exception as e: print(f"(Formatador Incorporação - v7 Numérico) ERRO INESPERADO: {e}"); traceback.print_exc(); raise RuntimeError(f"Erro inesperado: {e}") from e
+    except ValueError as ve: print(f"(Formatador Incorporação - v11 PCD) ERRO VALIDAÇÃO: {ve}"); traceback.print_exc(); raise ve
+    except Exception as e: print(f"(Formatador Incorporação - v11 PCD) ERRO INESPERADO: {e}"); traceback.print_exc(); raise RuntimeError(f"Erro inesperado: {e}") from e
