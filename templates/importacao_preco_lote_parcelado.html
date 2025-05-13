@@ -1,154 +1,299 @@
 {# templates/importacao_preco_lote_parcelado.html #} {% extends 'base.html' %}
-{% block title %}Importar Tabela Preço - Lote Parcelado{% endblock %} {% block
-styles %} {{ super() }}
+{% block title %}Importar Preço - Lote Parcelado{% endblock %} {% block styles
+%} {{ super() }}
 <style>
-  .description {
-    background-color: #495057;
-    color: #dee2e6;
-    border: 1px solid #495057;
-    padding: 15px;
-    border-radius: 6px;
-    margin-bottom: 25px;
-    font-size: 0.95em;
-    line-height: 1.5;
-  }
-  .form-container {
-    max-width: 800px; /* Aumentar largura */
-    margin: 20px auto;
-    padding: 25px;
-    background-color: #495057;
-    border: 1px solid #dee2e6;
-    border-radius: 8px;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
-  }
+  /* Estilos específicos, se necessário, mas tentaremos usar os globais. */
+  /* A classe .required-label pode ser movida para styles.css se for usada globalmente. */
   .required-label::after {
     content: " *";
-    color: #5aae02;
+    color: var(--vca-green-dark); /* Usando uma cor do tema para o asterisco */
+    font-weight: bold;
+    padding-left: 2px;
   }
+
+  /* Ajuste para os campos de parâmetros em linha */
+  .parameter-fields .form-group {
+    /* Se envolver cada campo em um .form-group */
+    margin-bottom: 0; /* Remove margem inferior para alinhar melhor na linha */
+  }
+  .parameter-fields .form-text {
+    /* Texto de ajuda menor */
+    font-size: 0.8rem;
+    margin-top: 4px;
+    color: var(--text-secondary);
+  }
+
+  /* O .upload-form-section pode precisar de uma largura um pouco maior
+     para acomodar os 3 campos de parâmetros em linha confortavelmente.
+     Se você mover os estilos para styles.css, pode criar uma variação:
+     .upload-form-section.wide { max-width: 750px; }
+     E então usar <div class="upload-form-section wide"> no HTML.
+     Por enquanto, vou manter o max-width padrão do .upload-form-section
+     e o Bootstrap cuidará do layout dos campos.
+  */
 </style>
 {% endblock %} {% block content %}
-<div class="container mt-4">
-  <h1>Importar Tabela de Preço - Lote Parcelado</h1>
+<div class="container page-container">
+  <h1>Importar Preço - Lote Parcelado</h1>
 
-  <div class="description">
+  <div class="tool-description-box">
+    {# REUTILIZA A CLASSE #}
     <p>
-      <strong>Instruções:</strong> Faça o upload da planilha Excel (.xlsx,
-      .xls). Informe a quantidade total de meses, a taxa de juros anual e até
-      qual ano deseja calcular as parcelas mensais. A ferramenta gerará um novo
-      arquivo <strong>CSV</strong> formatado.
+      <strong>Instruções:</strong> Faça o upload da sua planilha Excel
+      (<code>.xlsx</code>, <code>.xls</code>) com os dados dos lotes. Informe
+      também os parâmetros para o cálculo das parcelas: a quantidade total de
+      meses do financiamento, a taxa de juros anual para correção, e até qual
+      ano deseja que as colunas de parcelas mensais sejam geradas.
     </p>
     <p>
-      Certifique-se que a planilha contém colunas como <strong>QUADRA</strong>,
-      <strong>LOTE</strong>, <strong>VALOR</strong> (total) e
-      <strong>ENTRADA</strong>.
+      A ferramenta irá processar os dados, calcular as parcelas e gerar um
+      arquivo <code>.csv</code>
+      formatado para importação.
+    </p>
+    <p>
+      <small
+        >Certifique-se que a planilha contém colunas como
+        <strong>QUADRA</strong>, <strong>LOTE</strong>,
+        <strong>VALOR</strong> (valor total do lote) e
+        <strong>ENTRADA</strong> (valor da entrada).</small
+      >
     </p>
   </div>
 
-  {# Mensagens flash #} {% with messages =
-  get_flashed_messages(with_categories=true) %} {% if messages %} {% for
-  category, message in messages %}
-  <div
-    class="alert alert-{{ category if category != 'message' else 'info' }} alert-dismissible fade show"
-    role="alert"
-  >
-    {{ message }}
-    <button
-      type="button"
-      class="btn-close"
-      data-bs-dismiss="alert"
-      aria-label="Close"
-    ></button>
-  </div>
-  {% endfor %} {% endif %} {% endwith %}
+  {# Mensagens Flash já são tratadas pelo base.html #}
 
-  <div class="form-container">
+  <div class="upload-form-section">
+    {# REUTILIZA A CLASSE #}
+    <h2>Dados para Cálculo</h2>
     <form
       method="post"
       enctype="multipart/form-data"
       action="{{ url_for('importacao_preco_lote_parcelado_tool') }}"
+      id="uploadFormPrecoLoteParc"
+      {#
+      id
+      único
+      #}
     >
-      <div class="mb-3">
-        <label for="arquivo_entrada_lote_parc" class="form-label required-label"
-          ><strong>Selecione o Arquivo</strong></label
+      {{ form.csrf_token if form and form.csrf_token }} {# Seção de Upload de
+      Arquivo #}
+      <div class="file-input-wrapper">
+        {# REUTILIZA A CLASSE #}
+        <label
+          for="arquivo_entrada_preco_lote_parc"
+          {#
+          id
+          DIFERENTE
+          #}
+          class="custom-file-upload"
+          {#
+          REUTILIZA
+          A
+          CLASSE
+          #}
+          id="fileUploadLabelPrecoLoteParc"
+          {#
+          id
+          DIFERENTE
+          #}
         >
+          <span class="upload-icon">
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="48"
+              height="48"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.5"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              class="feather feather-upload-cloud"
+            >
+              <polyline points="16 16 12 12 8 16"></polyline>
+              <line x1="12" y1="12" x2="12" y2="21"></line>
+              <path
+                d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3"
+              ></path>
+              <polyline points="16 16 12 12 8 16"></polyline>
+            </svg>
+          </span>
+          <span class="upload-text"
+            >Clique para escolher a planilha de lotes</span
+          >
+          <span class="upload-hint">
+            Planilha Excel ({% for ext in ALLOWED_EXTENSIONS %}.{{ ext }}{% if
+            not loop.last %}, {% endif %}{% endfor %})
+          </span>
+        </label>
         <input
           type="file"
-          class="form-control"
-          id="arquivo_entrada_lote_parc"
+          id="arquivo_entrada_preco_lote_parc"
+          {#
+          id
+          DIFERENTE
+          #}
           name="arquivo_entrada"
+          {#
+          O
+          name
+          DEVE
+          ser
+          o
+          mesmo
+          #}
           accept="{% for ext in ALLOWED_EXTENSIONS %}.{{ ext }}{% if not loop.last %},{% endif %}{% endfor %}"
           required
+          class="hidden-file-input"
+          {#
+          Adiciona
+          classe
+          para
+          esconder
+          #}
         />
+        <div id="file-name-display-preco-lote-parc" class="file-name-display">
+          Nenhum arquivo selecionado
+        </div>
+        {# ID DIFERENTE #}
       </div>
 
-      {# --- CAMPOS DE PARÂMETROS --- #}
-      <div class="row g-3 mb-3">
-        <div class="col-md-4">
-          {# Ajustado para col-md-4 #}
-          <label for="quantidade_meses" class="form-label required-label"
-            ><strong>Total de Meses</strong></label
-          >
-          <input
-            type="number"
-            class="form-control"
-            id="quantidade_meses"
-            name="quantidade_meses"
-            placeholder="Ex: 180"
-            required
-            min="1"
-          />
-          <div class="form-text">Nº total de parcelas.</div>
+      {# Campos de Parâmetros Adicionais #}
+      <div class="parameter-fields">
+        {# Novo wrapper para os campos de parâmetros #}
+        <h3
+          style="
+            margin-top: 30px;
+            margin-bottom: 20px;
+            font-size: 1.1rem;
+            color: var(--text-secondary);
+            text-align: center;
+          "
+        >
+          Parâmetros do Financiamento
+        </h3>
+        <div class="row g-3 mb-4">
+          {# Usando classes Bootstrap para layout em linha e espaçamento #}
+          <div class="col-md-4 form-group">
+            <label for="quantidade_meses" class="form-label required-label"
+              >Total de Meses</label
+            >
+            <input
+              type="number"
+              class="form-control"
+              {#
+              Mantém
+              classes
+              Bootstrap
+              se
+              usadas
+              globalmente
+              #}
+              id="quantidade_meses"
+              name="quantidade_meses"
+              placeholder="Ex: 180"
+              required
+              min="1"
+            />
+            <div class="form-text">Nº total de parcelas do financiamento.</div>
+          </div>
+          <div class="col-md-4 form-group">
+            <label for="juros_anual_perc" class="form-label required-label"
+              >Juros Anual (%)</label
+            >
+            <input
+              type="number"
+              step="0.01"
+              class="form-control"
+              id="juros_anual_perc"
+              name="juros_anual_perc"
+              placeholder="Ex: 9.5"
+              required
+              min="0"
+            />
+            <div class="form-text">Taxa percentual para correção anual.</div>
+          </div>
+          <div class="col-md-4 form-group">
+            <label for="num_anos_parcelas" class="form-label required-label"
+              >Calcular Parcelas Até Ano Nº</label
+            >
+            <input
+              type="number"
+              class="form-control"
+              id="num_anos_parcelas"
+              name="num_anos_parcelas"
+              placeholder="Ex: 12"
+              required
+              min="1"
+            />
+            <div class="form-text">
+              Gerar colunas "MENSAL ANO X" até este ano.
+            </div>
+          </div>
         </div>
-        <div class="col-md-4">
-          {# Ajustado para col-md-4 #}
-          <label for="juros_anual_perc" class="form-label required-label"
-            ><strong>Juros Anual (%)</strong></label
-          >
-          <input
-            type="number"
-            step="0.01"
-            class="form-control"
-            id="juros_anual_perc"
-            name="juros_anual_perc"
-            placeholder="Ex: 9.5"
-            required
-            min="0"
-          />
-          <div class="form-text">Taxa para correção anual.</div>
-        </div>
-        {# --- NOVO CAMPO --- #}
-        <div class="col-md-4">
-          {# Ajustado para col-md-4 #}
-          <label for="num_anos_parcelas" class="form-label required-label"
-            ><strong>Calcular Até Ano Nº</strong></label
-          >
-          <input
-            type="number"
-            class="form-control"
-            id="num_anos_parcelas"
-            name="num_anos_parcelas"
-            placeholder="Ex: 12"
-            required
-            min="1"
-          />
-          <div class="form-text">Gerar colunas MENSAL ANO até este ano.</div>
-        </div>
-        {# --- FIM NOVO CAMPO --- #}
       </div>
-      {# --- FIM CAMPOS DE PARÂMETROS --- #}
+      {# Fim dos Campos de Parâmetros #}
 
-      <div style="text-align: center; margin-top: 30px">
+      <div class="submit-button-wrapper">
+        {# REUTILIZA A CLASSE #}
         <button type="submit" class="btn btn-primary btn-lg">
-          <i class="fas fa-calculator me-2"></i> Importar e Calcular Parcelas
+          {# Reutiliza classes de botão #} <i class="fas fa-calculator"></i> {#
+          Ícone para cálculo #} Importar e Calcular Parcelas
         </button>
+        {#
         <a
           href="{{ url_for('home') }}"
-          class="btn btn-secondary btn-lg"
+          class="btn btn-outline-secondary btn-lg"
           style="margin-left: 10px"
           >Cancelar</a
         >
+        #}
       </div>
     </form>
   </div>
 </div>
-{% endblock %} {% block scripts %} {{ super() }} {% endblock %}
+{% endblock %} {% block scripts %} {{ super() }}
+<script>
+  document.addEventListener("DOMContentLoaded", function () {
+    const fileInput = document.getElementById(
+      "arquivo_entrada_preco_lote_parc"
+    ); // ID específico
+    const fileNameDisplay = document.getElementById(
+      "file-name-display-preco_lote_parc"
+    );
+    const fileUploadLabel = document.getElementById(
+      "fileUploadLabelPrecoLoteParc"
+    );
+
+    if (fileInput && fileNameDisplay) {
+      fileInput.addEventListener("change", function () {
+        if (fileInput.files.length > 0) {
+          fileNameDisplay.textContent = fileInput.files[0].name;
+        } else {
+          fileNameDisplay.textContent = "Nenhum arquivo selecionado";
+        }
+      });
+    }
+
+    if (fileUploadLabel) {
+      // JS para drag & drop
+      fileUploadLabel.addEventListener("dragover", function (event) {
+        event.preventDefault();
+        fileUploadLabel.classList.add("dragging");
+      });
+      fileUploadLabel.addEventListener("dragleave", function () {
+        fileUploadLabel.classList.remove("dragging");
+      });
+      fileUploadLabel.addEventListener("drop", function (event) {
+        event.preventDefault();
+        fileUploadLabel.classList.remove("dragging");
+        // if (event.dataTransfer.files.length > 0) {
+        //   fileInput.files = event.dataTransfer.files;
+        //   const changeEvent = new Event('change');
+        //   fileInput.dispatchEvent(changeEvent);
+        // }
+      });
+    }
+  });
+</script>
+{% endblock %}
