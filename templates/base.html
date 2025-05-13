@@ -33,15 +33,15 @@
             <li class="dropdown">
                 {# Link principal do menu (href="#" para não navegar) #}
                 {# Adiciona 'active' se QUALQUER página de importação estiver ativa #}
-                <a href="#" {% if active_page and active_page.startswith('importacao_') %}class="active"{% endif %}>
+                <a href="#" {% if active_page and active_page.startswith('importacao_') and not active_page.startswith('importacao_preco_') %}class="active"{% endif %}>
                     Importação <span class="dropdown-indicator"></span> {# Indicador CSS #}
                 </a>
                 <ul class="dropdown-menu">
                     {# Os links internos levam às páginas #}
-                    <li><a href="{{ url_for('importacao_cv_index') }}">Importação CV</a></li>
-                    <li><a href="{{ url_for('importacao_cv_lote_tool') }}">Importação CV Lote</a></li>
-                    <li><a href="{{ url_for('importacao_sienge_index') }}">Importação SIENGE</a></li>
-                    <li><a href="{{ url_for('importacao_sienge_lote_index') }}">Importação SIENGE Lote</a></li>
+                    <li><a href="{{ url_for('importacao_cv_index') }}">CVCRM</a></li>
+                    <li><a href="{{ url_for('importacao_cv_lote_tool') }}">CVCRM LOTE</a></li>
+                    <li><a href="{{ url_for('importacao_sienge_index') }}">SIENGE</a></li>
+                    <li><a href="{{ url_for('importacao_sienge_lote_index') }}">SIENGE LOTE</a></li>
                 </ul>
             </li>
 
@@ -53,23 +53,23 @@
                     Formatação <span class="dropdown-indicator"></span> {# Indicador CSS #}
                 </a>
                 <ul class="dropdown-menu">
-                    <li><a href="{{ url_for('formatador_incorporacao_tool') }}">Formatador Incorporação</a></li>
-                    <li><a href="{{ url_for('formatador_lote_tool') }}">Formatador Lote</a></li>
-                    <li><a href="{{ url_for('formatador_tabela_precos_upload') }}">Formatação Tabela Preços</a></li>
+                    <li><a href="{{ url_for('formatador_incorporacao_tool') }}">INCORPORAÇÃO</a></li>
+                    <li><a href="{{ url_for('formatador_lote_tool') }}">LOTEAMENTO</a></li>
+                    <li><a href="{{ url_for('formatador_tabela_precos_upload') }}">TABELA DE PREÇO</a></li>
                 </ul>
             </li>
 
             <li class="dropdown">
                 {# Link principal do NOVO menu #}
                 {# Adiciona 'active' se QUALQUER página de importação de PREÇO estiver ativa #}
-                <a href="#" {% if active_page and active_page.startswith('importacao_preco_') %}class="active"{% endif %}>
-                    Importação Tabela Preço <span class="dropdown-indicator"></span> {# Indicador CSS #}
+                <a href="#" {% if active_page and active_page.startswith('importacao_preco_') and not active_page.startswith('importacao_') %}class="active"{% endif %}>
+                    Valores de Série <span class="dropdown-indicator"></span> {# Indicador CSS #}
                 </a>
                 {# Links internos do NOVO menu #}
                 <ul class="dropdown-menu">
-                    <li><a href="{{ url_for('importacao_preco_incorporacao_tool') }}">Preço Incorporação</a></li>
-                    <li><a href="{{ url_for('importacao_preco_lote_avista_tool') }}">Preço Lote à Vista</a></li>
-                    <li><a href="{{ url_for('importacao_preco_lote_parcelado_tool') }}">Preço Lote Parcelado</a></li>
+                    <li><a href="{{ url_for('importacao_preco_incorporacao_tool') }}">INCORPORAÇÃO</a></li>
+                    <li><a href="{{ url_for('importacao_preco_lote_avista_tool') }}">LOTE À VISTA</a></li>
+                    <li><a href="{{ url_for('importacao_preco_lote_parcelado_tool') }}">LOTE PARCELADO</a></li>
                 </ul>
             </li>
 
