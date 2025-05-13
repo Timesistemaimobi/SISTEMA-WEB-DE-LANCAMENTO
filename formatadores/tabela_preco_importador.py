@@ -266,14 +266,11 @@ def processar_preco_incorporacao(input_filepath, selected_valor_column_name):
     """
     print(f"(Preço Incorporação) Iniciando: {input_filepath}, Col Valor: '{selected_valor_column_name}'")
     try:
-        # 1. Leitura do Excel (pode precisar ajustar skiprows se o cabeçalho variar muito)
-        # Tenta ler com cabeçalho na linha 3 (índice 2), mas pode ser ajustado
+        # 1. Leitura do Excel
         header_row = 2
         try:
             df_input = pd.read_excel(input_filepath, engine='openpyxl', header=header_row, dtype=str)
-            # Remove linhas completamente vazias ANTES de remover colunas
             df_input = df_input.dropna(how='all').reset_index(drop=True)
-            # Remove colunas completamente vazias
             df_input = df_input.dropna(axis=1, how='all')
         except Exception as e_read:
             raise ValueError(f"Falha ao ler Excel (linha cabeçalho={header_row}). Verifique o arquivo e a linha do cabeçalho.") from e_read
@@ -284,33 +281,36 @@ def processar_preco_incorporacao(input_filepath, selected_valor_column_name):
         if selected_valor_column_name not in df_input.columns:
             raise ValueError(f"Coluna de valor selecionada '{selected_valor_column_name}' não encontrada nas colunas lidas: {df_input.columns.tolist()}")
 
-        # 2. Buscar Colunas Essenciais (de forma genérica)
+        # 2. Buscar Colunas Essenciais
         print("--- Buscando Cols Essenciais ---")
         col_ident_1 = find_column_flexible(df_input.columns, ['bloco', 'quadra'], 'IDENTIFICADOR 1 (Bloco/Quadra)', required=True)
         col_ident_2 = find_column_flexible(df_input.columns, ['apt', 'apto', 'apartamento', 'casa', 'unidade'], 'IDENTIFICADOR 2 (Apto/Casa/Unidade)', required=True)
-        # Tipologia ainda é útil para checar PCD e para ffill
         col_tipologia = find_column_flexible(df_input.columns, ['tipologia', 'tipo da unidade', 'descricao', 'descrição'], 'TIPOLOGIA', required=True)
         print("--- Fim Busca Cols ---")
 
-        # 3. Determinar Prefixos com base nos nomes das colunas encontradas
+        # 3. Determinar Prefixos
         norm_col_ident_1 = normalize_text_for_match(col_ident_1)
         norm_col_ident_2 = normalize_text_for_match(col_ident_2)
 
-        prefixo_1 = "QD" if 'quadra' in norm_col_ident_1 else "BL"
-        prefixo_2 = "CASA" if 'casa' in norm_col_ident_2 else "APT" # Default para APT se não for casa
+        # Prefixo para a coluna 'UNIDADE' (ex: "BL" ou "QD")
+        prefixo_unidade_ident_1 = "QD" if 'quadra' in norm_col_ident_1 else "BL"
+        prefixo_unidade_ident_2 = "CASA" if 'casa' in norm_col_ident_2 else "APT"
 
-        print(f"  >> Formato da unidade determinado: {prefixo_1}xx - {prefixo_2} yy")
+        # >>> MODIFICAÇÃO AQUI <<<
+        # Prefixo COMPLETO para a coluna 'BLOCO' de saída (ex: "BLOCO" ou "QUADRA")
+        prefixo_coluna_bloco_completo = "QUADRA" if 'quadra' in norm_col_ident_1 else "BLOCO"
+        print(f"  >> Prefixo para coluna BLOCO de saída determinado: '{prefixo_coluna_bloco_completo}'")
+        # Mantém o log do formato da unidade para clareza
+        print(f"  >> Formato da unidade (interno) determinado: {prefixo_unidade_ident_1}xx - {prefixo_unidade_ident_2} yy")
+
 
         # 4. Aplicar ffill (Forward Fill) onde apropriado
-        # Geralmente o Bloco/Quadra e Tipologia podem precisar de ffill
         print(f"Aplicando ffill na coluna Identificador 1: '{col_ident_1}'")
         df_input[col_ident_1] = df_input[col_ident_1].ffill()
         print(f"Aplicando ffill na coluna Tipologia: '{col_tipologia}'")
         df_input[col_tipologia] = df_input[col_tipologia].ffill()
-        # O Identificador 2 (Apto/Casa) geralmente NÃO deve ter ffill
 
-        # 5. Remover linhas onde o Identificador 2 (Apto/Casa) é nulo ou vazio APÓS ffill das outras
-        # Isso ajuda a remover linhas de cabeçalho repetido ou totais que não foram puladas
+        # 5. Remover linhas onde o Identificador 2 (Apto/Casa) é nulo ou vazio
         print(f"Linhas antes de dropna em '{col_ident_2}': {len(df_input)}")
         df_input = df_input.dropna(subset=[col_ident_2])
         df_input = df_input[df_input[col_ident_2].astype(str).str.strip() != '']
@@ -322,15 +322,16 @@ def processar_preco_incorporacao(input_filepath, selected_valor_column_name):
         # 6. Construir DataFrame de Saída
         df_output = pd.DataFrame(index=df_input.index)
 
-        # Coluna BLOCO (Saída): Contém o número formatado do Identificador 1 (seja Bloco ou Quadra)
-        ident_1_formatado = df_input[col_ident_1].fillna('').astype(str).str.extract(r'(\d+)', expand=False).fillna('0').astype(int).apply(lambda x: f"{x:02d}")
-        df_output['BLOCO'] = ident_1_formatado.apply(lambda x: f'="{x}"') # Força texto no Excel
+        # Coluna BLOCO (Saída): Contém o NOME COMPLETO (BLOCO/QUADRA) + número formatado
+        # >>> MODIFICAÇÃO AQUI <<<
+        ident_1_numeros = df_input[col_ident_1].fillna('').astype(str).str.extract(r'(\d+)', expand=False).fillna('0').astype(int).apply(lambda x: f"{x:02d}")
+        df_output['BLOCO'] = ident_1_numeros.apply(lambda num: f'="{prefixo_coluna_bloco_completo} {num}"') # Força texto no Excel
 
-        # Coluna UNIDADE (Saída): Usa a nova função genérica
+        # Coluna UNIDADE (Saída): Usa a função genérica com os prefixos curtos
         df_output['UNIDADE'] = df_input.apply(
             formatar_nome_unidade_generico,
             axis=1,
-            args=(col_ident_1, col_ident_2, col_tipologia, prefixo_1, prefixo_2) # Passa nomes das colunas e prefixos
+            args=(col_ident_1, col_ident_2, col_tipologia, prefixo_unidade_ident_1, prefixo_unidade_ident_2) # Passa prefixos curtos
         )
 
         # Coluna VALOR DO IMOVEL (Saída)
@@ -342,7 +343,7 @@ def processar_preco_incorporacao(input_filepath, selected_valor_column_name):
         # 7. Selecionar e Reordenar Colunas Finais
         df_output = df_output[['ETAPA', 'BLOCO', 'UNIDADE', 'VALOR DO IMOVEL']]
 
-        # 8. Filtrar linhas onde a UNIDADE deu erro (opcional, mas recomendado)
+        # 8. Filtrar linhas onde a UNIDADE deu erro
         print(f"Linhas antes de filtrar UNIDADE_ERRO: {len(df_output)}")
         df_output = df_output[df_output['UNIDADE'] != "UNIDADE_ERRO"]
         print(f"Linhas após filtrar UNIDADE_ERRO: {len(df_output)}")
