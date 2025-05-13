@@ -1,44 +1,259 @@
-{% extends "base.html" %} {% block title %}Formatador - Incorporação{% endblock
-%} {% block content %}
-<h1>Formatador - Incorporação</h1>
-<p>
-  Esta ferramenta processa uma planilha Excel para identificar blocos/quadras e
-  organizar os dados.
-</p>
-<ol>
-  <li>Identifica linhas começando com "QUADRA" ou "BLOCO" (coluna A).</li>
-  <li>Adiciona uma coluna "Bloco" com o número extraído dessas linhas.</li>
-  <li>Remove as linhas originais "QUADRA" / "BLOCO".</li>
-  <li>Remove o cabeçalho original (se houver).</li>
-  <li>Salva o resultado em um novo arquivo .xlsx.</li>
-</ol>
+{# templates/formatador_incorporacao.html #} {% extends "base.html" %} {% block
+title %}Formatador de Incorporação{% endblock %} {% block styles %} {{ super()
+}}
+<style>
+  /* Estilos específicos para a página do Formatador de Incorporação */
 
-<form
-  action="{{ url_for('formatador_incorporacao_tool') }}"
-  method="post"
-  enctype="multipart/form-data"
-  class="tool-form"
->
-  <h2>Arquivo de Entrada</h2>
-  <div class="form-group">
-    <label for="arquivo_entrada"
-      >Selecione a planilha Excel (.xlsx, .xls):</label
-    >
-    <input
-      type="file"
-      id="arquivo_entrada"
-      name="arquivo_entrada"
-      accept=".xlsx, .xls"
-      required
-    />
-    <small
-      >A ferramenta espera encontrar os delimitadores "QUADRA X" ou "BLOCO Y" na
-      primeira coluna (A).</small
-    >
+  .tool-description-box {
+    /* Novo nome para o box de descrição */
+    background-color: #1f2937;
+    color: var(--text-secondary);
+    border: 1px solid var(--border-color);
+    border-left: 5px solid var(--vca-green-primary);
+    padding: 25px 30px; /* Um pouco mais de padding */
+    border-radius: 8px;
+    margin-bottom: 35px; /* Espaço antes do formulário */
+    font-size: 0.95em;
+    line-height: 1.65;
+    box-shadow: var(--shadow-sm);
+  }
+  .tool-description-box p {
+    margin-bottom: 0.8em;
+  }
+  .tool-description-box p:last-child {
+    margin-bottom: 0;
+  }
+  .tool-description-box strong,
+  .tool-description-box b {
+    /* Estilo para bold dentro da descrição */
+    color: var(--text-primary);
+    font-weight: 600;
+  }
+  .tool-description-box ul {
+    list-style-type: decimal; /* Lista numerada */
+    padding-left: 25px; /* Indentação da lista */
+    margin-top: 10px;
+    margin-bottom: 15px;
+  }
+  .tool-description-box li {
+    margin-bottom: 5px;
+  }
+
+  .upload-form-section {
+    /* Container para o formulário de upload */
+    max-width: 600px; /* Largura controlada para o formulário */
+    margin: 30px auto; /* Centralizado e com margem */
+    padding: 35px; /* Bom padding interno */
+    background-color: var(--bg-container);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    box-shadow: var(--shadow-md);
+  }
+
+  .upload-form-section h2 {
+    /* Título "Arquivo de Entrada" */
+    font-size: 1.3rem;
+    color: var(--text-primary);
+    margin-bottom: 25px;
+    text-align: center;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--border-color-light, #eee); /* Linha sutil abaixo do H2 */
+  }
+
+  .file-input-wrapper {
+    /* Wrapper para o input de arquivo e label */
+    margin-bottom: 30px; /* Espaço antes do botão */
+  }
+
+  /* Estilo para o botão customizado de upload que esconde o input real */
+  .custom-file-upload {
+    border: 2px dashed var(--border-color-strong);
+    border-radius: 8px;
+    padding: 30px;
+    text-align: center;
+    cursor: pointer;
+    display: block; /* Para ocupar a largura total */
+    background-color: var(--bg-body);
+    transition: var(--transition-normal);
+  }
+  .custom-file-upload:hover {
+    border-color: var(--vca-green-primary);
+    background-color: #323438;
+  }
+  .custom-file-upload .upload-icon {
+    /* Para um ícone (SVG ou FontAwesome) */
+    font-size: 2.5rem; /* Tamanho do ícone */
+    color: var(--vca-green-primary);
+    margin-bottom: 10px;
+    display: block; /* Para centralizar */
+  }
+  .custom-file-upload .upload-text {
+    font-weight: 500;
+    color: var(--text-primary);
+    margin-bottom: 5px;
+  }
+  .custom-file-upload .upload-hint {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+  }
+  input[type="file"]#arquivo_entrada {
+    /* Esconde o input de arquivo padrão */
+    opacity: 0;
+    position: absolute;
+    width: 0.1px;
+    height: 0.1px;
+    overflow: hidden;
+    z-index: -1;
+  }
+  #file-name-display-incorp {
+    /* Display para nome do arquivo */
+    margin-top: 15px;
+    text-align: center;
+    font-size: 0.9em;
+    color: var(--text-secondary);
+    font-style: italic;
+    min-height: 1.2em; /* Evita pulo de layout */
+  }
+
+  .submit-button-wrapper {
+    /* Wrapper para centralizar o botão */
+    text-align: center;
+  }
+</style>
+{% endblock %} {% block content %}
+<div class="container page-container">
+  {# Adiciona uma classe para espaçamento se necessário #}
+  <h1>Formatador - Incorporação</h1>
+
+  <div class="tool-description-box">
+    <p>
+      Esta ferramenta processa uma planilha Excel para identificar
+      blocos/quadras e organizar os dados, seguindo estas etapas:
+    </p>
+    <ul>
+      <li>
+        Identifica linhas começando com "<b>QUADRA</b>" ou "<b>BLOCO</b>"
+        (geralmente na coluna A).
+      </li>
+      <li>
+        Adiciona uma coluna (ex: "BLOCO" ou "QUADRA") com o número extraído
+        dessas linhas de título.
+      </li>
+      <li>
+        Remove as linhas originais que continham apenas "QUADRA X" / "BLOCO Y".
+      </li>
+      <li>
+        Remove o cabeçalho original dos dados, se detectado acima dos dados
+        reais.
+      </li>
+      <li>Salva o resultado em um novo arquivo <b>.xlsx</b> formatado.</li>
+    </ul>
   </div>
 
-  <button type="submit" class="full-width" style="margin-top: 25px">
-    Processar e Baixar Planilha Formatada (.xlsx)
-  </button>
-</form>
+  <div class="upload-form-section">
+    <h2>Arquivo de Entrada</h2>
+    <form
+      method="post"
+      enctype="multipart/form-data"
+      action="{{ url_for('formatador_incorporacao_tool') }}"
+      id="uploadFormIncorp"
+    >
+      {{ form.csrf_token if form and form.csrf_token }}
+
+      <div class="file-input-wrapper">
+        <label
+          for="arquivo_entrada"
+          class="custom-file-upload"
+          id="fileUploadLabelIncorp"
+        >
+          {# Ícone SVG de Upload (Exemplo - substitua por FontAwesome se
+          preferir) #}
+          <span class="upload-icon">
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="48"
+              height="48"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.5"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              class="feather feather-upload-cloud"
+            >
+              <polyline points="16 16 12 12 8 16"></polyline>
+              <line x1="12" y1="12" x2="12" y2="21"></line>
+              <path
+                d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3"
+              ></path>
+              <polyline points="16 16 12 12 8 16"></polyline>
+            </svg>
+          </span>
+          <span class="upload-text">Clique para escolher um arquivo</span>
+          <span class="upload-hint">Planilha Excel (.xlsx, .xls)</span>
+        </label>
+        <input
+          type="file"
+          id="arquivo_entrada"
+          name="arquivo_entrada"
+          accept=".xlsx, .xls"
+          required
+        />
+        <div id="file-name-display-incorp">Nenhum arquivo selecionado</div>
+      </div>
+
+      <div class="submit-button-wrapper">
+        <button type="submit" class="btn btn-primary btn-lg">
+          <i class="fas fa-cogs"></i> {# Mantenha se usa FontAwesome #}
+          Processar e Baixar Planilha
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %} {% block scripts %} {{ super() }}
+<script>
+  document.addEventListener("DOMContentLoaded", function () {
+    const fileInputIncorp = document.getElementById("arquivo_entrada");
+    const fileNameDisplayIncorp = document.getElementById(
+      "file-name-display-incorp"
+    );
+    const fileUploadLabelIncorp = document.getElementById(
+      "fileUploadLabelIncorp"
+    );
+
+    if (fileInputIncorp && fileNameDisplayIncorp) {
+      fileInputIncorp.addEventListener("change", function () {
+        if (fileInputIncorp.files.length > 0) {
+          fileNameDisplayIncorp.textContent = fileInputIncorp.files[0].name;
+        } else {
+          fileNameDisplayIncorp.textContent = "Nenhum arquivo selecionado";
+        }
+      });
+    }
+
+    // Opcional: Feedback visual ao arrastar arquivos sobre a área (drag & drop)
+    if (fileUploadLabelIncorp) {
+      fileUploadLabelIncorp.addEventListener("dragover", function (event) {
+        event.preventDefault(); // Necessário para permitir o drop
+        fileUploadLabelIncorp.classList.add("dragging");
+      });
+      fileUploadLabelIncorp.addEventListener("dragleave", function () {
+        fileUploadLabelIncorp.classList.remove("dragging");
+      });
+      fileUploadLabelIncorp.addEventListener("drop", function (event) {
+        event.preventDefault();
+        fileUploadLabelIncorp.classList.remove("dragging");
+        // O input[type=file] já captura o arquivo via 'change' se o drop for bem sucedido
+        // Para pegar o arquivo diretamente do drop:
+        // if (event.dataTransfer.files.length > 0) {
+        //   fileInputIncorp.files = event.dataTransfer.files;
+        //   // Dispara o evento change manualmente
+        //   const changeEvent = new Event('change');
+        //   fileInputIncorp.dispatchEvent(changeEvent);
+        // }
+      });
+    }
+  });
+</script>
 {% endblock %}
