@@ -1,99 +1,451 @@
-/* static/styles.css - Correção Layout Navbar Desktop e Fundo Dropdown */
+/* static/styles.css - Design Criativo, Minimalista e Elegante */
 
-/* 1. Definir Variáveis de Cor (CSS Custom Properties) */
+/* 1. Reset Básico e Variáveis de Cor (CSS Custom Properties) */
 :root {
-  /* Modo Claro (Padrão) */
-  --bg-color: #f4f7f6;
-  --text-color: #333333;
-  --container-bg: #ffffff;
-  --container-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
-  --border-color: #e0e0e0;
-  --border-color-strong: #cccccc;
-  --primary-color: #68c900;
-  --primary-hover-color: #5aae02;
-  --secondary-color: #2a3f54; /* Azul para navbar/títulos */
-  --accent-color: #73879c;
-  --accent-hover-color: #5a6f84;
-  --link-color: var(--primary-color);
-  --link-hover-color: var(--primary-hover-color);
-  --navbar-bg: var(--secondary-color);
-  --navbar-link-color: #e7e7e7;
-  --navbar-link-hover-bg: var(--primary-color);
-  --navbar-link-hover-color: #ffffff;
-  --table-header-bg: #f8f9fa;
-  --table-header-color: #444444;
-  --table-row-odd-bg: #fdfdfd;
-  --table-row-hover-bg: #f1f1f1;
-  --input-bg: #ffffff;
-  --input-border: var(--border-color-strong);
-  --input-focus-border: var(--primary-color);
-  --input-focus-shadow: rgba(104, 201, 0, 0.3);
-  --input-placeholder-color: #aaa;
-  --button-text-color: #ffffff;
-  --flash-error-bg: #f8d7da;
-  --flash-error-text: #721c24;
-  --flash-error-border: #f5c6cb;
-  --flash-warning-bg: #fff3cd;
-  --flash-warning-text: #856404;
-  --flash-warning-border: #ffeeba;
-  --flash-info-bg: #d1ecf1;
-  --flash-info-text: #0c5460;
-  --flash-info-border: #bee5eb;
-  --flash-success-bg: #d4edda;
-  --flash-success-text: #155724;
-  --flash-success-border: #c3e6cb;
+  /* Paleta Principal VCA - Ajuste conforme o verde exato da marca */
+  --vca-green-primary: #68c900; /* Verde principal que você já usa */
+  --vca-green-dark: #5aae02; /* Tom mais escuro para hover/detalhes */
+  --vca-green-light: #d4edda; /* Tom pastel para fundos suaves ou alertas */
+  --vca-green-ultralight: #f0fff0; /* Quase branco com toque de verde */
+
+  /* Neutros */
+  --text-primary: #333740; /* Cinza escuro para texto principal */
+  --text-secondary: #5f6368; /* Cinza médio para texto secundário */
+  --text-light: #f8f9fa; /* Branco/Cinza muito claro para texto em fundos escuros */
+  --bg-body: #f9fafb; /* Fundo do corpo principal - cinza muito claro */
+  --bg-container: #ffffff; /* Fundo dos containers principais (cartões) */
+  --border-color: #e5e7eb; /* Cor de borda sutil */
+  --border-color-strong: #d1d5db; /* Bordas mais definidas */
+
+  /* Cores de Acento e Interação */
+  --accent-color: var(--vca-green-primary);
+  --accent-hover-color: var(--vca-green-dark);
+  --link-color: var(--vca-green-primary);
+  --link-hover-color: var(--vca-green-dark);
+
+  /* Navbar */
+  --navbar-bg: #ffffff; /* Navbar clara para um visual mais leve */
+  --navbar-text-color: var(--text-primary);
+  --navbar-link-hover-bg: var(--vca-green-ultralight);
+  --navbar-link-active-bg: var(--vca-green-primary);
+  --navbar-link-active-color: var(--text-light);
+  --navbar-shadow: 0 2px 8px rgba(0, 0, 0, 0.07);
+
+  /* Alertas Flash */
+  --flash-error-bg: #ffebee;
+  --flash-error-text: #c62828;
+  --flash-error-border: #ef9a9a;
+  --flash-warning-bg: #fff8e1;
+  --flash-warning-text: #ff8f00;
+  --flash-warning-border: #ffe082;
+  --flash-info-bg: #e3f2fd;
+  --flash-info-text: #0d47a1;
+  --flash-info-border: #90caf9;
+  --flash-success-bg: var(--vca-green-ultralight);
+  --flash-success-text: #2e7d32;
+  --flash-success-border: #a5d6a7;
+
+  /* Sombras */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.04);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.07),
+    0 2px 4px -1px rgba(0, 0, 0, 0.05);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.07),
+    0 4px 6px -2px rgba(0, 0, 0, 0.05);
+
+  /* Transições */
+  --transition-fast: all 0.15s ease-in-out;
+  --transition-normal: all 0.25s ease-in-out;
 }
 
-/* 2. Definir Variáveis para Modo Escuro */
+/* Modo Escuro (Opcional, mas recomendado para acessibilidade e preferência) */
 @media (prefers-color-scheme: dark) {
   :root {
-    --bg-color: #1a1d21;
-    --text-color: #d1d5db;
-    --container-bg: #252a30;
-    --container-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
-    --border-color: #4b5563;
-    --border-color-strong: #6b7280;
-    --secondary-color: #86d92b; /* Verde mais claro para títulos */
-    --accent-color: #6b7280;
-    --accent-hover-color: #9ca3af;
-    --navbar-bg: #1f2428;
-    --navbar-link-color: #a0aec0;
-    --table-header-bg: #374151;
-    --table-header-color: #e5e7eb;
-    --table-row-odd-bg: #20252b;
-    --table-row-hover-bg: #313840;
-    --input-bg: #374151;
-    --input-border: var(--border-color);
-    --input-focus-shadow: rgba(104, 201, 0, 0.4);
-    --input-placeholder-color: #9ca3af;
-    --flash-error-bg: #58151c;
-    --flash-error-text: #f8d7da;
-    --flash-error-border: #a04f5b;
-    --flash-warning-bg: #664d03;
-    --flash-warning-text: #fff3cd;
-    --flash-warning-border: #b89f4c;
-    --flash-info-bg: #0c343d;
-    --flash-info-text: #d1ecf1;
-    --flash-info-border: #57919e;
-    --flash-success-bg: #0a361f;
-    --flash-success-text: #d4edda;
-    --flash-success-border: #4a8c5a;
-  }
-  input[type="file"]::file-selector-button {
-    background-color: var(--accent-color);
-    color: var(--button-text-color);
-    border: 1px solid var(--border-color-strong);
-  }
-  input[type="file"]::file-selector-button:hover {
-    background-color: var(--accent-hover-color);
+    --text-primary: #e5e7eb;
+    --text-secondary: #9ca3af;
+    --text-light: #1f2937;
+    --bg-body: #111827; /* Azul bem escuro/quase preto */
+    --bg-container: #1f2937; /* Cinza escuro para containers */
+    --border-color: #374151;
+    --border-color-strong: #4b5563;
+
+    --navbar-bg: #1f2937;
+    --navbar-text-color: var(--text-primary);
+    --navbar-link-hover-bg: #374151; /* Cinza mais escuro para hover no modo escuro */
+    --navbar-link-active-bg: var(--vca-green-primary);
+    --navbar-link-active-color: var(
+      --text-light
+    ); /* Mantém texto claro no verde */
+
+    --flash-error-bg: #4a1818;
+    --flash-error-text: #ffcdd2;
+    --flash-error-border: #893535;
+    --flash-warning-bg: #4d380b;
+    --flash-warning-text: #ffecb3;
+    --flash-warning-border: #a8862a;
+    --flash-info-bg: #0e2a47;
+    --flash-info-text: #bbdefb;
+    --flash-info-border: #3b75a7;
+    --flash-success-bg: #103a13;
+    --flash-success-text: #c8e6c9;
+    --flash-success-border: #388e3c;
   }
 }
 
-/* 3. Animação de Entrada */
+/* 2. Estilos Gerais */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+  font-size: 16px; /* Base para REMs */
+}
+
+body {
+  font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+    Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji",
+    "Segoe UI Symbol";
+  margin: 0;
+  padding-top: 80px; /* Espaço para navbar fixa + um pouco de respiro */
+  background-color: var(--bg-body);
+  color: var(--text-primary);
+  line-height: 1.65;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  transition: var(--transition-normal);
+}
+
+/* 3. Navbar - Elegante e Fixa */
+nav.navbar {
+  background-color: var(--navbar-bg);
+  height: 65px; /* Altura um pouco maior */
+  padding: 0 25px; /* Espaçamento lateral */
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  z-index: 1000;
+  box-shadow: var(--navbar-shadow);
+  display: flex;
+  align-items: center;
+  transition: var(--transition-normal);
+}
+
+nav.navbar .navbar-container {
+  /* Usado para logo e toggler */
+  display: flex;
+  justify-content: space-between; /* Afasta logo do toggler/menu */
+  align-items: center;
+  width: 100%; /* Ocupa toda a largura da navbar */
+}
+
+nav.navbar .logo-container img {
+  max-height: 35px; /* Ajuste conforme sua logo */
+  display: block;
+  transition: transform 0.2s ease-out;
+}
+nav.navbar .logo-container img:hover {
+  transform: scale(1.03);
+}
+
+.navbar-toggler {
+  /* Botão Hambúrguer */
+  display: none; /* Escondido por padrão, mostrado via media query */
+  background: none;
+  border: none;
+  color: var(--navbar-text-color);
+  font-size: 1.75rem; /* Tamanho do ícone */
+  cursor: pointer;
+  padding: 8px;
+  line-height: 1;
+  border-radius: 4px;
+  transition: color 0.2s, background-color 0.2s;
+}
+.navbar-toggler:hover {
+  color: var(--vca-green-primary);
+}
+
+/* Container dos links do menu */
+nav.navbar .navbar-collapse {
+  display: flex; /* Desktop: sempre flex */
+  margin-left: auto; /* Empurra o menu para a direita */
+}
+
+nav.navbar .navbar-collapse > ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  align-items: center; /* Alinha os LIs verticalmente */
+}
+
+nav.navbar li {
+  position: relative; /* Para posicionamento do dropdown */
+  margin: 0 5px; /* Pequeno espaçamento entre itens principais */
+}
+
+nav.navbar li > a {
+  /* Estilo dos links principais do menu */
+  color: var(--navbar-text-color);
+  text-decoration: none;
+  padding: 10px 15px;
+  border-radius: 6px; /* Cantos suavemente arredondados */
+  transition: var(--transition-fast);
+  display: inline-flex;
+  align-items: center;
+  font-weight: 500; /* Peso da fonte médio */
+  font-size: 0.95rem;
+  white-space: nowrap;
+}
+
+nav.navbar li > a:hover,
+nav.navbar li.dropdown:hover > a {
+  /* Hover no item principal ou no LI dropdown */
+  background-color: var(--navbar-link-hover-bg);
+  color: var(--vca-green-primary);
+}
+
+nav.navbar li > a.active {
+  /* Link ativo */
+  background-color: var(--navbar-link-active-bg);
+  color: var(--navbar-link-active-color);
+  font-weight: 600;
+}
+nav.navbar li > a.active:hover {
+  background-color: var(
+    --vca-green-dark
+  ); /* Escurece um pouco no hover do ativo */
+  color: var(--navbar-link-active-color);
+}
+
+.dropdown-indicator {
+  margin-left: 6px;
+  border-left: 4px solid transparent;
+  border-right: 4px solid transparent;
+  border-top: 5px solid currentColor; /* Usa a cor do texto do link */
+  opacity: 0.7;
+  transition: var(--transition-fast);
+}
+nav.navbar li.dropdown:hover > a > .dropdown-indicator {
+  transform: rotate(180deg);
+  opacity: 1;
+}
+
+/* Dropdown Menu (Submenu) */
+nav.navbar ul.dropdown-menu {
+  display: block; /* MANTENHA DISPLAY BLOCK - vamos controlar com opacity/visibility */
+  position: absolute;
+  top: calc(100% + 5px);
+  left: 50%;
+  transform: translateX(-50%);
+  min-width: 200px;
+  background-color: var(--bg-container);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  box-shadow: var(--shadow-lg);
+  padding: 8px 0;
+  list-style: none;
+  z-index: 1001;
+
+  /* --- MUDANÇAS AQUI --- */
+  opacity: 0;
+  visibility: hidden;
+  transform: translateX(-50%) translateY(10px); /* Começa um pouco abaixo para efeito de entrada */
+  transition: opacity 0.2s ease-in-out, visibility 0s linear 0.2s,
+    /* Esconde DEPOIS da opacidade sumir */ transform 0.2s ease-in-out;
+  /* REMOVIDO transition-delay daqui para ser mais específico abaixo */
+  transform-origin: top center;
+}
+
+nav.navbar li.dropdown:hover > ul.dropdown-menu,
+nav.navbar li.dropdown > ul.dropdown-menu:hover {
+  /* <<< ADICIONADO :hover no próprio submenu */
+  opacity: 1;
+  visibility: visible;
+  transform: translateX(-50%) translateY(0px); /* Sobe para posição final */
+  transition: opacity 0.2s ease-in-out, visibility 0s linear 0s,
+    /* Mostra IMEDIATAMENTE */ transform 0.2s ease-in-out;
+  /* ADICIONA um delay para quando o hover SAI do item principal, mas NÃO do submenu */
+}
+
+.custom-file-upload.dragging {
+  border-color: var(--vca-green-dark); /* Cor mais forte ao arrastar */
+  background-color: #1f2937; /* Fundo mais destacado */
+}
+
+nav.navbar ul.dropdown-menu li a {
+  display: block;
+  padding: 10px 20px;
+  color: var(--text-secondary); /* Cor mais suave para itens de submenu */
+  text-decoration: none;
+  font-size: 0.9rem;
+  white-space: nowrap;
+  transition: var(--transition-fast);
+  border-radius: 4px; /* Arredondamento interno nos links */
+  margin: 2px 5px; /* Pequena margem para não colar nas bordas */
+}
+nav.navbar ul.dropdown-menu li a:hover {
+  background-color: var(--vca-green-ultralight);
+  color: var(--vca-green-dark);
+}
+
+/* 4. Container Principal e Conteúdo */
+main.container {
+  background-color: var(--bg-container);
+  padding: 30px 40px; /* Mais padding */
+  border-radius: 12px; /* Mais arredondado */
+  box-shadow: var(--shadow-md);
+  max-width: 960px; /* Um pouco mais estreito para foco */
+  margin: 40px auto; /* Mais margem superior/inferior */
+  border: 1px solid var(--border-color);
+  animation: fadeInSlideUp 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
+  transition: var(--transition-normal);
+}
+
+/* Adicione ao final do seu static/styles.css */
+
+/* Estilos para páginas de Formatador (Incorporação, Lote, etc.) */
+
+.tool-description-box {
+  background-color: #1f2937; /* Ajuste esta cor se necessário para modo claro/escuro via variáveis */
+  /* Se estiver no modo escuro e #1f2937 é var(--bg-container), então está ok */
+  /* Se estiver no modo claro, talvez prefira: background-color: var(--vca-green-ultralight); */
+  color: var(--text-secondary);
+  border: 1px solid var(--border-color);
+  border-left: 5px solid var(--vca-green-primary);
+  padding: 25px 30px;
+  border-radius: 8px;
+  margin-bottom: 35px;
+  font-size: 0.95em;
+  line-height: 1.65;
+  box-shadow: var(--shadow-sm);
+}
+.tool-description-box p {
+  margin-bottom: 0.8em;
+}
+.tool-description-box p:last-child {
+  margin-bottom: 0;
+}
+.tool-description-box strong,
+.tool-description-box b {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+.tool-description-box ul,
+.tool-description-box ol {
+  /* Aplicar a ol também */
+  list-style-type: decimal;
+  padding-left: 25px;
+  margin-top: 10px;
+  margin-bottom: 15px;
+}
+.tool-description-box li {
+  margin-bottom: 6px; /* Consistência */
+  line-height: 1.5; /* Consistência */
+}
+.tool-description-box .highlight {
+  /* Para destacar texto importante */
+  font-weight: 600;
+  color: var(--vca-green-dark);
+}
+
+.upload-form-section {
+  max-width: 600px;
+  margin: 30px auto;
+  padding: 35px;
+  background-color: var(--bg-container);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  box-shadow: var(--shadow-md);
+}
+
+.upload-form-section h2 {
+  font-size: 1.3rem;
+  color: var(--text-primary);
+  margin-bottom: 25px;
+  text-align: center;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--border-color-light, #eee); /* var(--border-color) seria mais consistente */
+}
+
+.file-input-wrapper {
+  margin-bottom: 30px;
+}
+
+.custom-file-upload {
+  border: 2px dashed var(--border-color-strong);
+  border-radius: 8px;
+  padding: 30px;
+  text-align: center;
+  cursor: pointer;
+  display: block;
+  background-color: var(--bg-body);
+  transition: var(--transition-normal);
+}
+.custom-file-upload:hover {
+  border-color: var(--vca-green-primary);
+  background-color: #323438; /* Ajuste para modo claro: var(--vca-green-ultralight); */
+}
+.custom-file-upload.dragging {
+  /* Para efeito de arrastar */
+  border-color: var(--vca-green-dark);
+  background-color: var(
+    --vca-green-light
+  ); /* Ou um tom de #323438 mais claro se em modo escuro */
+}
+.custom-file-upload .upload-icon {
+  font-size: 2.5rem;
+  color: var(--vca-green-primary);
+  margin-bottom: 10px;
+  display: block;
+}
+.custom-file-upload .upload-text {
+  font-weight: 500;
+  color: var(--text-primary);
+  margin-bottom: 5px;
+}
+.custom-file-upload .upload-hint {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+
+/* Input de arquivo escondido (usado por ambos os formatadores) */
+/* Mova este seletor para styles.css se ele for realmente global para todos os inputs de arquivo */
+/* Se for só para esses formatadores, pode ficar aqui. */
+/* input[type="file"]#arquivo_entrada - MUITO ESPECÍFICO, melhor usar classe se for o mesmo estilo */
+.hidden-file-input {
+  /* Crie e use esta classe nos inputs de arquivo */
+  opacity: 0;
+  position: absolute;
+  width: 0.1px;
+  height: 0.1px;
+  overflow: hidden;
+  z-index: -1;
+}
+
+/* Estilo para o nome do arquivo (pode ser genérico) */
+.file-name-display {
+  margin-top: 15px;
+  text-align: center;
+  font-size: 0.9em;
+  color: var(--text-secondary);
+  font-style: italic;
+  min-height: 1.2em;
+}
+
+.submit-button-wrapper {
+  text-align: center;
+}
+/* Seus botões já devem estar estilizados globalmente pelo .btn, .btn-primary etc. */
+/* Se precisar de ajustes específicos para esses botões de formatador: */
+/* .upload-form-section .btn { ... } */
+
 @keyframes fadeInSlideUp {
   from {
     opacity: 0;
-    transform: translateY(15px);
+    transform: translateY(20px);
   }
   to {
     opacity: 1;
@@ -101,453 +453,217 @@
   }
 }
 
-/* 4. Estilos Gerais */
-body {
-  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
-    Oxygen, Ubuntu, Cantarell, "Open Sans", "Helvetica Neue", sans-serif;
-  margin: 0;
-  padding-top: 75px;
-  background-color: var(--bg-color);
-  color: var(--text-color);
-  line-height: 1.6;
-  transition: background-color 0.3s ease-in-out, color 0.3s ease-in-out;
-}
-*,
-*::before,
-*::after {
-  box-sizing: border-box;
-}
-
-/* 5. Menu de Navegação (Navbar) */
-nav.navbar {
-  background-color: var(--navbar-bg);
-  padding: 0 15px;
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  z-index: 1000;
-  box-shadow: 0 3px 6px rgba(0, 0, 0, 0.15);
-  height: 60px;
-  display: flex; /* Mantém flex */
-  align-items: center; /* Alinha verticalmente */
-}
-
-/* Logo Container */
-nav.navbar .logo-container {
-  margin-right: 20px;
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-}
-nav.navbar .logo-container img {
-  max-height: 38px;
-  display: block;
-}
-nav.navbar .logo-container img:hover {
-  transform: scale(1.05);
-  transition: transform 0.2s ease-in-out;
-}
-
-/* Toggler (Mobile) */
-.navbar-toggler {
-  display: none;
-  margin-left: auto;
-  background: none;
-  border: none;
-  color: var(--navbar-link-color);
-  font-size: 1.8rem;
-  cursor: pointer;
-  padding: 5px 10px;
-}
-
-/* UL Principal do Menu (Container dos LIs: Importação, Formatação) */
-/* <<< FOCO AQUI >>> */
-nav.navbar ul#main-menu-list, /* Se usar ID */
-nav.navbar .navbar-collapse > ul /* Se usar a classe .navbar-collapse como wrapper */ {
-  list-style: none !important; /* FORÇA remoção de bullets */
-  margin: 0;
-  padding: 0 !important; /* FORÇA sem padding */
-  display: flex !important; /* FORÇA flex */
-  flex-direction: row !important; /* FORÇA direção horizontal */
-  align-items: center; /* Alinha LIs verticalmente */
-  height: 100%; /* Ocupa altura da navbar */
-  width: auto; /* Largura baseada no conteúdo */
-  position: static;
-  overflow: visible;
-}
-
-/* Item de Lista Principal (LI) */
-nav.navbar li {
-  position: relative;
-  margin: 0; /* SEM MARGEM */
-  list-style-type: none !important; /* Garante sem bullets no LI */
-  padding: 0 !important; /* Garante sem padding no LI */
-  /* REMOVIDO display: list-item; */
-}
-/* Link Principal (A) */
-nav.navbar li > a {
-  color: var(--navbar-link-color);
-  text-decoration: none;
-  padding: 10px 15px; /* Espaçamento VISUAL */
-  border-radius: 5px;
-  transition: background-color 0.2s ease-in-out, color 0.2s ease-in-out;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  height: 100%;
-  box-sizing: border-box;
-  position: relative;
-  font-size: 0.9em;
-  white-space: nowrap;
-}
-/* Hover/Active links NÃO dropdown */
-nav.navbar li:not(.dropdown) > a:hover,
-nav.navbar li:not(.dropdown) > a.active {
-  background-color: var(--navbar-link-hover-bg);
-  color: var(--navbar-link-hover-color);
-}
-/* Hover/Active links principais dropdown */
-nav.navbar li.dropdown > a:hover,
-nav.navbar li.dropdown > a.active {
-  background-color: var(--navbar-link-hover-bg);
-  color: var(--navbar-link-hover-color);
-  border-bottom-left-radius: 0;
-  border-bottom-right-radius: 0;
-  transform: none;
-  box-shadow: none;
-}
-/* Indicador Dropdown */
-.dropdown-indicator {
-  display: inline-block;
-  width: 0;
-  height: 0;
-  margin-left: 5px;
-  vertical-align: middle;
-  border-left: 4px solid transparent;
-  border-right: 4px solid transparent;
-  border-top: 5px solid currentColor;
-  transition: transform 0.2s ease-in-out;
-  opacity: 0.8;
-}
-
-/* 6. Dropdown Menu (UL aninhado) */
-nav.navbar li.dropdown ul.dropdown-menu {
-  display: none;
-  position: absolute;
-  top: 100%;
-  left: 0;
-  z-index: 1001;
-  min-width: 100%;
-  width: auto;
-  padding: 0; /* SEM Padding na UL */
-  margin: 0;
-  list-style: none;
-  background-color: transparent; /* UL Transparente */
-  border: 1px solid var(--border-color);
-  border-top: none;
-  border-radius: 0 0 6px 6px;
-  box-shadow: 0 5px 10px rgba(0, 0, 0, 0.2);
-  opacity: 0;
-  visibility: hidden;
-  transform: translateY(5px);
-  transition: opacity 0.15s ease-in-out, visibility 0.15s ease-in-out,
-    transform 0.15s ease-in-out;
-  overflow: hidden; /* Corta cantos */
-}
-nav.navbar li.dropdown:hover > ul.dropdown-menu {
-  display: block;
-  opacity: 1;
-  visibility: visible;
-  transform: translateY(0);
-}
-
-/* Item LI dentro do dropdown */
-nav.navbar ul.dropdown-menu li {
-  margin: 0; /* SEM Margem */
-  width: 100%;
-  display: block;
-  background-color: var(--navbar-bg); /* FUNDO NO LI */
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-  list-style-type: none !important; /* Garante sem bullets */
-  padding: 0 !important; /* Garante sem padding */
-}
-/* Link A dentro do dropdown */
-nav.navbar ul.dropdown-menu li a {
-  display: block;
-  padding: 10px 18px; /* Padding INTERNO */
-  color: var(--navbar-link-color);
-  white-space: nowrap;
-  font-size: 0.88em;
-  transition: background-color 0.15s ease-in-out, color 0.15s ease-in-out;
-  text-decoration: none;
-  border-radius: 0;
-  background-color: transparent;
-}
-/* Último item LI */
-nav.navbar ul.dropdown-menu li:last-child {
-  border-bottom: none;
-  border-bottom-left-radius: 5px;
-  border-bottom-right-radius: 5px;
-  overflow: hidden; /* Corta o link interno */
-}
-/* Hover/Focus nos links */
-nav.navbar ul.dropdown-menu li a:hover,
-nav.navbar ul.dropdown-menu li a:focus {
-  background-color: var(--primary-color);
-  color: var(--button-text-color);
-}
-
-/* Ajustes Modo Escuro Dropdown */
-@media (prefers-color-scheme: dark) {
-  nav.navbar li.dropdown ul.dropdown-menu {
-    background-color: transparent;
-    border-color: var(--border-color);
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
-  }
-  nav.navbar ul.dropdown-menu li {
-    background-color: var(--navbar-bg);
-    border-bottom-color: rgba(255, 255, 255, 0.1);
-  }
-  nav.navbar ul.dropdown-menu li:last-child {
-    border-bottom: none;
-  }
-  nav.navbar ul.dropdown-menu li a {
-    color: var(--navbar-link-color);
-  }
-  nav.navbar ul.dropdown-menu li a:hover,
-  nav.navbar ul.dropdown-menu li a:focus {
-    background-color: var(--primary-color);
-    color: var(--button-text-color);
-  }
-}
-
-/* --- RESTANTE DO CSS (Container, Títulos, Forms, Tabelas, Flash, Responsividade Mobile) --- */
-/* Cole aqui o restante do seu CSS a partir da seção 7 (sem alterações) */
-
-/* 7. Container Principal */
-main.container {
-  background-color: var(--container-bg);
-  padding: 25px 35px;
-  border-radius: 10px;
-  box-shadow: var(--container-shadow);
-  max-width: 1100px;
-  margin: 30px auto;
-  border: 1px solid var(--border-color);
-  animation: fadeInSlideUp 0.6s ease-out forwards;
-  transition: background-color 0.3s ease-in-out, border-color 0.3s ease-in-out,
-    box-shadow 0.3s ease-in-out;
-}
-
-/* 8. Títulos */
+/* 5. Títulos */
 h1,
 h2,
-h3 {
-  color: var(--secondary-color);
-  margin-top: 1.2em;
-  margin-bottom: 0.7em;
+h3,
+h4,
+h5,
+h6 {
+  color: var(--text-primary); /* Títulos com a cor primária do texto */
+  font-weight: 600; /* Um pouco mais de peso */
   line-height: 1.3;
-  transition: color 0.3s ease-in-out;
+  margin-top: 0; /* Remove margem superior padrão para controle */
 }
 h1 {
+  font-size: 2rem; /* Maior */
   text-align: center;
-  font-size: 1.9em;
+  margin-bottom: 30px;
+  padding-bottom: 15px;
   border-bottom: 1px solid var(--border-color);
-  padding-bottom: 12px;
-  transition: border-color 0.3s ease-in-out;
+  color: var(--vca-green-primary); /* H1 com cor de destaque */
 }
 h2 {
-  font-size: 1.5em;
+  font-size: 1.5rem;
+  margin-bottom: 20px;
+  color: var(--text-secondary); /* H2 um pouco mais suave */
 }
 h3 {
-  font-size: 1.25em;
+  font-size: 1.25rem;
+  margin-bottom: 15px;
 }
 
-/* 9. Texto e Links */
-p {
-  margin-bottom: 1.1em;
-}
-small {
-  opacity: 0.8;
-  font-size: 0.85em;
-}
-a {
-  color: var(--link-color);
-  text-decoration: none;
-  transition: color 0.2s ease-in-out, text-decoration 0.2s ease-in-out;
-}
-a:hover {
-  color: var(--link-hover-color);
-  text-decoration: underline;
-}
-.cancel-link {
-  display: inline-block;
-  text-align: center;
-  margin-top: 20px;
-  color: var(--text-color);
-  opacity: 0.85;
-  font-size: 0.9em;
-  transition: color 0.2s ease-in-out, opacity 0.2s ease-in-out;
-}
-.cancel-link:hover {
-  color: var(--link-hover-color);
-  opacity: 1;
-}
-
-/* 10. Formulários */
+/* 6. Formulários Minimalistas */
 .form-group {
-  margin-bottom: 20px;
+  margin-bottom: 25px;
 }
 label {
   display: block;
   margin-bottom: 8px;
-  font-weight: 600;
-  color: var(--text-color);
-  font-size: 0.95em;
-  transition: color 0.3s ease-in-out;
+  font-weight: 500; /* Médio */
+  color: var(--text-secondary);
+  font-size: 0.9rem; /* Menor */
 }
 input[type="text"],
-input[type="file"],
+input[type="number"], /* Adicionando number */
 input[list],
-select {
+select,
+textarea {
+  /* Adicionando textarea */
   width: 100%;
-  padding: 11px 14px;
-  border: 1px solid var(--input-border);
-  border-radius: 6px;
-  box-sizing: border-box;
-  font-size: 1em;
-  background-color: var(--input-bg);
-  color: var(--text-color);
-  transition: border-color 0.25s ease-in-out, box-shadow 0.25s ease-in-out,
-    background-color 0.3s ease-in-out, color 0.3s ease-in-out;
+  padding: 12px 15px;
+  border: 1px solid var(--border-color-strong);
+  border-radius: 8px; /* Mais arredondado */
+  font-size: 1rem;
+  background-color: var(
+    --bg-body
+  ); /* Fundo sutilmente diferente do container */
+  color: var(--text-primary);
+  transition: var(--transition-normal);
+  box-shadow: var(--shadow-sm);
 }
-input::placeholder {
-  color: var(--input-placeholder-color);
-  font-style: italic;
-  transition: color 0.3s ease-in-out;
+input::placeholder,
+textarea::placeholder {
+  color: #9ca3af; /* Cinza claro para placeholder */
+  font-style: normal;
+  opacity: 0.8;
 }
 input[type="text"]:focus,
-input[type="file"]:focus,
+input[type="number"]:focus,
 input[list]:focus,
-select:focus {
-  border-color: var(--input-focus-border);
-  box-shadow: 0 0 0 3px var(--input-focus-shadow);
+select:focus,
+textarea:focus {
+  border-color: var(--vca-green-primary);
+  box-shadow: 0 0 0 3px rgba(104, 201, 0, 0.25); /* Sombra de foco VCA */
   outline: none;
+  background-color: var(--bg-container); /* Fundo branco ao focar */
 }
 input[type="file"] {
-  padding: 9px 14px;
+  padding: 0; /* Reset padding */
+  border: 1px solid var(--border-color-strong);
+  border-radius: 8px;
+  background-color: var(--bg-body);
+  box-shadow: var(--shadow-sm);
+  overflow: hidden; /* Para o botão se encaixar bem */
 }
 input[type="file"]::file-selector-button {
-  padding: 9px 16px;
-  margin-right: 12px;
+  padding: 12px 20px;
+  margin-right: 15px;
   background-color: var(--accent-color);
-  color: var(--button-text-color);
+  color: var(--text-light);
   border: none;
-  border-radius: 5px;
+  border-right: 1px solid var(--border-color-strong); /* Divisor sutil */
   cursor: pointer;
-  transition: background-color 0.2s ease-in-out, transform 0.15s ease-in-out;
+  transition: var(--transition-fast);
+  font-weight: 500;
 }
 input[type="file"]::file-selector-button:hover {
   background-color: var(--accent-hover-color);
-  transform: scale(1.03);
-}
-input[type="checkbox"] {
-  margin-right: 8px;
-  vertical-align: middle;
-  width: 17px;
-  height: 17px;
-  accent-color: var(--primary-color);
-  cursor: pointer;
 }
 label.checkbox-label {
+  font-weight: normal;
+  color: var(--text-secondary);
+  font-size: 0.95rem;
   display: inline-flex;
   align-items: center;
-  font-weight: normal;
-  color: var(--text-color);
   cursor: pointer;
-  transition: color 0.3s ease-in-out;
+}
+input[type="checkbox"] {
+  margin-right: 10px;
+  width: 18px;
+  height: 18px;
+  accent-color: var(--vca-green-primary);
+  border: 1px solid var(--border-color-strong);
+  border-radius: 4px;
+  cursor: pointer;
+  appearance: none; /* Para estilização customizada */
+  -webkit-appearance: none;
+  position: relative;
+  transition: var(--transition-fast);
+}
+input[type="checkbox"]:checked {
+  background-color: var(--vca-green-primary);
+  border-color: var(--vca-green-primary);
+}
+input[type="checkbox"]:checked::before {
+  /* Checkmark customizado */
+  content: "✓";
+  font-size: 14px;
+  color: white;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  line-height: 1;
 }
 
-/* 11. Botões */
+/* 7. Botões Elegantes */
 button[type="submit"],
 input[type="submit"],
 .button-link {
   display: inline-block;
-  background-color: var(--primary-color);
-  color: var(--button-text-color);
-  padding: 12px 28px;
+  background: linear-gradient(
+    to right,
+    var(--vca-green-primary),
+    var(--vca-green-dark)
+  );
+  color: var(--text-light);
+  padding: 12px 30px;
   border: none;
-  border-radius: 6px;
+  border-radius: 8px;
   cursor: pointer;
-  font-size: 1.05em;
+  font-size: 1rem;
   font-weight: 600;
   text-align: center;
   text-decoration: none;
-  transition: background-color 0.2s ease-in-out, transform 0.15s ease-in-out,
-    box-shadow 0.2s ease-in-out;
-  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.15);
-  will-change: transform, box-shadow;
+  transition: var(--transition-normal);
+  box-shadow: var(--shadow-md);
+  letter-spacing: 0.5px;
 }
 button[type="submit"]:hover,
 input[type="submit"]:hover,
 .button-link:hover {
-  background-color: var(--primary-hover-color);
-  box-shadow: 0 5px 10px rgba(0, 0, 0, 0.18);
-  transform: translateY(-3px);
+  background: linear-gradient(
+    to right,
+    var(--vca-green-dark),
+    var(--vca-green-primary)
+  );
+  box-shadow: var(--shadow-lg);
+  transform: translateY(-2px);
 }
 button[type="submit"]:active,
 input[type="submit"]:active,
 .button-link:active {
-  transform: translateY(-1px);
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-}
-button[type="submit"].full-width,
-input[type="submit"].full-width {
-  display: block;
-  width: 100%;
+  transform: translateY(0px);
+  box-shadow: var(--shadow-sm);
 }
 
-/* 12. Tabelas */
+/* 8. Tabelas Limpas */
 table {
   width: 100%;
-  border-collapse: collapse;
-  margin: 25px 0;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+  border-collapse: separate; /* Para usar border-spacing */
+  border-spacing: 0; /* Remove espaço entre células */
+  margin: 30px 0;
+  font-size: 0.95rem;
   border: 1px solid var(--border-color);
-  transition: border-color 0.3s ease-in-out;
-  overflow: hidden;
-  border-radius: 8px;
+  border-radius: 10px; /* Arredonda a tabela toda */
+  box-shadow: var(--shadow-sm);
+  overflow: hidden; /* Garante que o border-radius seja aplicado aos cantos */
 }
 th,
 td {
-  border-width: 0 0 1px 0;
-  border-style: solid;
-  border-color: var(--border-color);
+  border: none; /* Remove bordas individuais de células */
   padding: 14px 18px;
   text-align: left;
   vertical-align: middle;
-  transition: border-color 0.3s ease-in-out, background-color 0.2s ease-in-out;
+  border-bottom: 1px solid var(--border-color); /* Apenas borda inferior */
 }
 th {
-  background-color: var(--table-header-bg);
+  background-color: var(--bg-body); /* Fundo sutil para header */
   font-weight: 600;
-  color: var(--table-header-color);
-  font-size: 0.95em;
+  color: var(--text-primary);
   white-space: nowrap;
-  border-bottom-width: 2px;
+  border-bottom-width: 2px; /* Linha mais grossa abaixo do header */
   border-bottom-color: var(--border-color-strong);
 }
-tbody tr:nth-child(odd) {
-  background-color: var(--table-row-odd-bg);
+tbody tr:last-child td {
+  border-bottom: none; /* Remove borda da última linha */
 }
 tbody tr:hover {
-  background-color: var(--table-row-hover-bg);
-}
-tbody tr:last-child td {
-  border-bottom-width: 0;
+  background-color: var(--vca-green-ultralight); /* Hover suave */
 }
 
-/* 13. Mensagens Flash */
+/* 9. Mensagens Flash */
 .flash-messages {
   list-style: none;
   padding: 0;
@@ -556,242 +672,209 @@ tbody tr:last-child td {
 .flash-messages li {
   padding: 15px 20px;
   margin-bottom: 15px;
-  border-radius: 6px;
-  border: 1px solid transparent;
+  border-radius: 8px;
+  border: 1px solid;
   font-weight: 500;
+  box-shadow: var(--shadow-sm);
   display: flex;
   align-items: center;
-  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
-  transition: background-color 0.3s ease-in-out, color 0.3s ease-in-out,
-    border-color 0.3s ease-in-out;
+}
+.flash-messages li::before {
+  /* Ícone para alertas (exemplo) */
+  font-family: "Segoe UI Symbol", sans-serif; /* Fonte que tem ícones */
+  margin-right: 10px;
+  font-size: 1.2em;
 }
 .flash-messages .error {
   background-color: var(--flash-error-bg);
   color: var(--flash-error-text);
   border-color: var(--flash-error-border);
 }
+.flash-messages .error::before {
+  content: "❌";
+}
 .flash-messages .warning {
   background-color: var(--flash-warning-bg);
   color: var(--flash-warning-text);
   border-color: var(--flash-warning-border);
+}
+.flash-messages .warning::before {
+  content: "⚠️";
 }
 .flash-messages .info {
   background-color: var(--flash-info-bg);
   color: var(--flash-info-text);
   border-color: var(--flash-info-border);
 }
+.flash-messages .info::before {
+  content: "ℹ️";
+}
 .flash-messages .success {
   background-color: var(--flash-success-bg);
   color: var(--flash-success-text);
   border-color: var(--flash-success-border);
 }
+.flash-messages .success::before {
+  content: "✅";
+}
 
+/* 10. Responsividade Mobile */
 @media (max-width: 992px) {
+  /* Ponto de quebra para menu hambúrguer */
+  body {
+    padding-top: 65px;
+  }
   nav.navbar {
-    height: auto;
-    min-height: 60px;
-    /* Precisa do container para space-between funcionar no mobile */
-    padding: 0; /* Padding vai para o .navbar-container */
-    display: block; /* Navbar deixa de ser flex */
-    position: relative; /* Para conter o .navbar-collapse absoluto */
+    padding: 0; /* Padding gerenciado pelo .navbar-container */
+    display: block; /* Para o collapse funcionar abaixo */
+    position: relative; /* Para o .navbar-collapse absoluto */
   }
   .navbar-container {
-    /* Container da logo e toggle */
-    width: 100%;
+    /* Container da logo e toggler */
     display: flex;
     justify-content: space-between;
     align-items: center;
-    height: 60px;
-    padding: 0 15px; /* Padding dentro do container */
-    position: relative; /* Para z-index funcionar se necessário */
-    z-index: 1001; /* Garante que fique sobre o menu colapsado */
-    background-color: var(
-      --navbar-bg
-    ); /* Fundo para cobrir menu quando fechado */
-  }
-  /* Esconde o UL principal do desktop no mobile */
-  nav.navbar ul#main-menu-list,
-  nav.navbar .navbar-collapse > ul {
-    /* Seletor mais genérico */
-    display: none;
+    height: 65px;
+    padding: 0 20px; /* Espaçamento interno */
+    position: relative;
+    z-index: 1001; /* Sobre o menu colapsado */
+    background-color: var(--navbar-bg); /* Cobre o menu */
   }
   .navbar-toggler {
     display: block;
-  } /* Mostra o botão */
-
-  /* Estilos para .navbar-collapse quando aberto no mobile */
-  /* Certifique-se que você tem <div class="navbar-collapse"> no base.html */
-  .navbar-collapse {
-    /* Estilos base (escondido) */
-    display: none;
-    width: 100%;
-    position: absolute;
-    top: 60px;
+  } /* Mostra o hambúrguer */
+  nav.navbar .navbar-collapse {
+    display: none; /* Escondido por padrão no mobile */
+    position: absolute; /* Posicionado abaixo da navbar-container */
+    top: 65px;
     left: 0;
-    max-height: 0;
-    overflow-y: auto;
-    transition: max-height 0.3s ease-out, padding 0.3s ease-out,
-      background-color 0.3s ease-in-out;
-    padding: 0;
+    width: 100%;
     background-color: var(--navbar-bg);
-    box-shadow: 0 3px 6px rgba(0, 0, 0, 0.1);
-    z-index: 1000; /* Abaixo do container */
-
-    /* Estilos para UL e filhos QUANDO DENTRO do .navbar-collapse */
-    ul {
-      display: flex;
-      flex-direction: column;
-      align-items: stretch;
-      width: 100%;
-      padding: 0;
-      height: auto;
-    }
-    li {
-      margin-right: 0;
-      width: 100%;
-      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-    }
-    li:last-child {
-      border-bottom: none;
-    }
-    li a {
-      padding: 14px 20px;
-      width: 100%;
-      border-radius: 0;
-      box-shadow: none;
-      transform: none !important;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      gap: 6px;
-      height: auto;
-      font-size: 1em;
-    }
-    li a.active {
-      background-color: transparent;
-    }
-    li a:hover {
-      background-color: rgba(255, 255, 255, 0.1);
-      color: #fff;
-    }
-
-    /* Dropdown Mobile DENTRO do collapse */
-    li.dropdown ul.dropdown-menu {
-      position: static;
-      display: none;
-      width: 100%;
-      background-color: rgba(0, 0, 0, 0.15);
-      border: none;
-      box-shadow: none;
-      padding: 0;
-      margin: 0;
-      opacity: 1;
-      visibility: visible;
-      transform: none;
-      max-height: none;
-      transition: none;
-      border-top: none;
-      overflow: visible;
-    }
-    li.dropdown.open > ul.dropdown-menu {
-      display: block;
-    }
-    ul.dropdown-menu li {
-      border-bottom: none;
-      background-color: transparent;
-    }
-    ul.dropdown-menu li a {
-      padding: 12px 20px 12px 35px;
-      font-size: 0.9em;
-      color: var(--navbar-link-color);
-      justify-content: flex-start;
-      opacity: 0.9;
-    }
-    ul.dropdown-menu li a:hover,
-    ul.dropdown-menu li a:focus {
-      background-color: var(--primary-color);
-      color: var(--button-text-color);
-      opacity: 1;
-    }
-    li.dropdown > a {
-      cursor: pointer;
-    }
-    li.dropdown.open > a > .dropdown-indicator {
-      transform: rotate(180deg);
-    }
+    box-shadow: var(--shadow-md);
+    max-height: 0; /* Para animação */
+    overflow-y: auto; /* Scroll se o menu for muito grande */
+    transition: max-height 0.3s ease-out, padding-bottom 0.3s ease-out;
+    padding-bottom: 0;
   }
-  .navbar-collapse.show {
-    /* Classe para mostrar */
-    display: block; /* Volta a ser bloco */
-    max-height: calc(100vh - 60px);
+  nav.navbar .navbar-collapse.show {
+    display: block;
+    max-height: calc(100vh - 65px); /* Altura máxima */
+    padding-bottom: 10px; /* Espaço no final */
+  }
+  nav.navbar .navbar-collapse > ul {
+    flex-direction: column; /* Links empilhados */
+    align-items: stretch; /* Ocupam toda a largura */
+  }
+  nav.navbar li {
+    margin: 0;
+    width: 100%;
+  }
+  nav.navbar li > a {
+    padding: 15px 20px;
+    border-radius: 0;
+    width: 100%;
+    display: flex; /* Para alinhar indicador e texto */
+    justify-content: space-between; /* Afasta indicador */
+    font-size: 1rem;
+  }
+  nav.navbar li > a.active {
+    background-color: var(--vca-green-primary); /* Mantém destaque */
+    color: var(--text-light);
+  }
+  nav.navbar li > a.active:hover {
+    background-color: var(--vca-green-dark);
+  }
+  nav.navbar li.dropdown > a:hover,
+  nav.navbar li.dropdown:hover > a {
+    /* Remove hover de desktop no mobile se dropdown está fechado */
+    background-color: transparent;
+    color: var(--navbar-text-color);
+  }
+  nav.navbar li.dropdown.open > a {
+    /* Item principal do dropdown aberto */
+    background-color: var(--navbar-link-hover-bg);
+    color: var(--vca-green-primary);
+  }
+  nav.navbar li.dropdown.open > a > .dropdown-indicator {
+    transform: rotate(180deg);
+  }
+
+  /* Dropdown Mobile */
+  nav.navbar ul.dropdown-menu {
+    position: static; /* Não mais absoluto */
+    display: none; /* Escondido por padrão */
+    width: 100%;
+    box-shadow: none;
+    border: none;
+    border-top: 1px solid var(--border-color); /* Linha divisória */
+    border-radius: 0;
     padding: 0;
+    margin-top: 0;
+    background-color: rgba(0, 0, 0, 0.03); /* Fundo sutil para subitens */
+    opacity: 1;
+    visibility: visible;
+    transform: none;
+  }
+  nav.navbar li.dropdown.open > ul.dropdown-menu {
+    display: block;
+  } /* Mostra quando o pai está aberto */
+
+  nav.navbar ul.dropdown-menu li a {
+    padding: 12px 20px 12px 35px; /* Indentação para subitens */
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+  }
+  nav.navbar ul.dropdown-menu li a:hover {
+    background-color: var(--vca-green-ultralight);
+    color: var(--vca-green-dark);
   }
 
-  /* Outros ajustes mobile */
   main.container {
-    max-width: 95%;
+    max-width: 100%;
+    margin: 20px 15px;
     padding: 20px;
-    margin: 20px auto;
   }
   h1 {
-    font-size: 1.6em;
-  }
-  h2 {
-    font-size: 1.3em;
-  }
-  th,
-  td {
-    padding: 10px 12px;
-    font-size: 0.9em;
-  }
-  button[type="submit"],
-  input[type="submit"],
-  .button-link {
-    font-size: 1em;
-    padding: 10px 20px;
+    font-size: 1.75rem;
   }
 }
 
 @media (max-width: 576px) {
-  /* Ajustes para telas muito pequenas */
   body {
     padding-top: 60px;
+  } /* Ajuste fino para navbar menor */
+  nav.navbar .navbar-container {
+    height: 60px;
+    padding: 0 15px;
   }
-  nav.navbar {
-    min-height: 55px;
+  nav.navbar .navbar-collapse {
+    top: 60px;
   }
-  .navbar-container {
-    height: 55px;
-  }
-  .navbar-collapse {
-    top: 55px;
-  } /* Ajusta posição do menu mobile */
-  .navbar-collapse.show {
-    max-height: calc(100vh - 55px);
+  nav.navbar .navbar-collapse.show {
+    max-height: calc(100vh - 60px);
   }
   nav.navbar .logo-container img {
     max-height: 30px;
-    margin-right: 10px;
-  }
-  /* Aplica ao A dentro do LI dentro do UL dentro do .navbar-collapse */
-  .navbar-collapse ul li a {
-    font-size: 0.95em;
-    padding: 11px 15px;
-  }
-  .navbar-collapse ul ul.dropdown-menu li a {
-    font-size: 0.88em;
-    padding: 9px 15px 9px 30px;
   }
   main.container {
+    margin: 15px 10px;
     padding: 15px;
-    margin: 15px auto;
   }
   h1 {
-    font-size: 1.5em;
+    font-size: 1.5rem;
   }
-  th,
-  td {
-    padding: 8px 10px;
-    font-size: 0.85em;
+  input[type="text"],
+  input[type="number"],
+  select,
+  textarea,
+  input[type="file"]::file-selector-button {
+    padding: 10px 12px;
+    font-size: 0.95rem;
+  }
+  button[type="submit"],
+  input[type="submit"],
+  .button-link {
+    padding: 10px 20px;
+    font-size: 0.95rem;
   }
 }
