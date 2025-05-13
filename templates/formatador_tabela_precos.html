@@ -1,68 +1,146 @@
-{# templates/formatador_tabela_precos.html #} {% extends 'base.html' %} {#
-Certifique-se que 'base.html' é o nome correto #} {% block title %}Formatar
-Tabela de Preços{% endblock %} {% block styles %} {{ super() }} {# Inclui
-estilos do base.html se houver #}
+{# templates/formatador_tabela_precos.html #} {% extends 'base.html' %} {% block
+title %}Formatar Tabela de Preços{% endblock %} {% block styles %} {{ super() }}
+{# Inclui estilos do base.html #}
 <style>
-  /* Estilos para os campos CSV */
-  #csv-options {
-    background-color: #e9ecef; /* Cor de fundo levemente diferente (Bootstrap bg-light) */
-    border: 1px solid #ced4da; /* Borda sutil */
-    padding: 1rem 1.25rem;
-    border-radius: 0.375rem;
-    margin-top: 1rem; /* Espaço acima das opções CSV */
+  /* Herda muito do styles.css, mas podemos adicionar ajustes finos */
+
+  /* Descrição da Ferramenta */
+  .tool-description {
+    /* Renomeado de .description para evitar conflito com .description geral */
+    background-color: #1f2937; /* Fundo bem suave */
+    color: var(--text-secondary);
+    border: 1px solid var(--border-color);
+    border-left: 5px solid var(--vca-green-primary); /* Destaque lateral */
+    padding: 20px 25px;
+    border-radius: 8px;
+    margin-bottom: 35px;
+    font-size: 0.95em;
+    line-height: 1.6;
+    box-shadow: var(--shadow-sm);
   }
-  #csv-options h5 {
-    margin-bottom: 1rem;
-    color: #495057;
+  .tool-description p {
+    margin-bottom: 0.8em;
   }
-  #csv-options label {
-    font-size: 0.9em; /* Label um pouco menor */
-    color: #495057;
+  .tool-description p:last-child {
+    margin-bottom: 0;
+  }
+  .tool-description strong {
+    color: var(--text-primary);
+    font-weight: 600;
   }
 
-  /* Estilos gerais mantidos da sua versão anterior */
-  .description {
-    background-color: var(
-      --flash-info-bg,
-      #cfe2ff
-    ); /* Fallback se variável não definida */
-    color: var(--flash-info-text, #084298);
-    border: 1px solid var(--flash-info-border, #b6d4fe);
-    padding: 15px;
-    border-radius: 6px;
-    margin-bottom: 25px;
-    font-size: 0.95em;
-    line-height: 1.5;
-  }
-  .form-container {
-    max-width: 700px; /* Aumenta um pouco para acomodar opções CSV */
+  /* Container do Formulário */
+  .form-upload-container {
+    /* Renomeado para especificidade */
+    max-width: 650px; /* Largura adequada para os campos */
     margin: 0 auto;
-    padding: 25px;
-    border: 1px solid var(--border-color, #dee2e6);
-    border-radius: 8px;
-    background-color: var(--container-bg, #fff);
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+    padding: 30px; /* Mais padding interno */
+    border: 1px solid var(--border-color);
+    border-radius: 12px; /* Mais arredondado */
+    background-color: var(--bg-container);
+    box-shadow: var(--shadow-md);
   }
-  /* Ajusta input file se necessário */
-  input[type="file"].form-control {
-    /* Aplica a inputs file com a classe form-control */
-    border: 1px dashed var(--input-border, #ced4da);
-    padding: 10px;
+
+  /* Campo de Upload de Arquivo */
+  .file-upload-area {
+    border: 2px dashed var(--border-color-strong);
+    border-radius: 8px;
+    padding: 30px; /* Espaçoso */
     text-align: center;
     cursor: pointer;
-    background-color: #495057; /* Fundo levemente cinza */
+    background-color: var(--bg-body); /* Fundo sutilmente diferente */
+    transition: var(--transition-normal);
+    margin-bottom: 25px;
   }
-  input[type="file"].form-control:hover {
-    border-color: var(--primary-color, #0d6efd);
-    background-color: var(--table-row-hover-bg, #e9ecef);
+  .file-upload-area:hover {
+    border-color: var(--vca-green-primary);
+    background-color: var(--vca-green-ultralight);
+  }
+  .file-upload-area label strong {
+    /* "Selecione o Arquivo" */
+    color: var(--vca-green-primary);
+    font-size: 1.1em;
+    display: block;
+    margin-bottom: 10px;
+  }
+  .file-upload-area .file-upload-instructions {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    margin-top: 5px;
+  }
+  input[type="file"]#arquivo_entrada {
+    /* Esconde o input padrão, a label fará o trabalho */
+    opacity: 0;
+    position: absolute;
+    width: 0.1px;
+    height: 0.1px;
+    overflow: hidden;
+    z-index: -1;
+  }
+  #file-name-display {
+    /* Para mostrar o nome do arquivo selecionado */
+    margin-top: 10px;
+    font-size: 0.9em;
+    color: var(--text-secondary);
+    font-style: italic;
+    height: 1.2em; /* Evita pulo de layout */
+  }
+
+  /* Opções CSV - Estilo minimalista */
+  #csv-options {
+    background-color: var(--bg-body);
+    border: 1px solid var(--border-color);
+    padding: 20px 25px;
+    border-radius: 8px;
+    margin-top: 25px;
+    box-shadow: var(--shadow-sm);
+  }
+  #csv-options h5 {
+    margin-bottom: 18px;
+    color: var(--text-primary);
+    font-weight: 600;
+    font-size: 1.1em;
+    border-bottom: 1px solid var(--border-color);
+    padding-bottom: 10px;
+  }
+  #csv-options .row {
+    /* Ajuste para o .row do Bootstrap se estiver usando */
+    --bs-gutter-x: 1.5rem; /* Exemplo de variável Bootstrap, ajuste conforme seu framework */
+  }
+  #csv-options label {
+    /* Labels dentro das opções CSV */
+    font-size: 0.85em;
+    color: var(--text-secondary);
+    margin-bottom: 6px;
+  }
+  #csv-options select.form-select-sm, /* Se usar classes Bootstrap */
+  #csv-options select {
+    font-size: 0.9em; /* Selects um pouco menores */
+    padding: 8px 12px; /* Menor padding */
+    background-color: var(--bg-container); /* Fundo branco para selects */
+  }
+
+  /* Botão de Envio */
+  .submit-button-container {
+    /* Novo container para o botão */
+    text-align: center;
+    margin-top: 35px;
+  }
+
+  /* Ícone no botão (se estiver usando FontAwesome ou similar) */
+  .btn i.fas {
+    margin-right: 8px;
+    font-size: 0.9em; /* Ajusta tamanho do ícone */
+    opacity: 0.9;
   }
 </style>
 {% endblock %} {% block content %}
 <div class="container mt-4">
-  {# Adiciona container Bootstrap padrão #}
-  <h1>Formatar Tabela de Preços</h1>
+  {# Mantém container Bootstrap se estiver usando globalmente #}
+  <h1>Formatador - Tabela de Preços</h1>
 
-  <div class="description">
+  <div class="tool-description">
+    {# Classe renomeada #}
     <p>
       <strong>Instruções:</strong> Faça o upload da planilha ou arquivo CSV. A
       ferramenta irá processar os dados, permitir o mapeamento de blocos por
@@ -78,52 +156,40 @@ estilos do base.html se houver #}
     </p>
   </div>
 
-  <div class="form-container">
+  <div class="form-upload-container">
+    {# Classe renomeada #}
     <form
       method="post"
       enctype="multipart/form-data"
       action="{{ url_for('formatador_tabela_precos_upload') }}"
       id="upload-form"
-      {#
-      Adicionado
-      id
-      para
-      o
-      JS
-      #}
     >
-      {# CSRF se usar WTForms #} {{ form.csrf_token if form and form.csrf_token
-      }}
-
-      <div class="mb-3">
-        {# Usa mb-3 do Bootstrap para espaçamento #}
-        <label for="arquivo_entrada" class="form-label"
-          ><strong>Selecione o Arquivo (.xlsx, .xls, .csv):</strong></label
-        >
+      {{ form.csrf_token if form and form.csrf_token }} {# Nova área de upload
+      estilizada #}
+      <div
+        class="file-upload-area"
+        onclick="document.getElementById('arquivo_entrada').click();"
+      >
+        <label for="arquivo_entrada" class="form-label">
+          <strong>Selecione o Arquivo</strong>
+        </label>
         <input
           type="file"
-          class="form-control"
-          {#
-          Adiciona
-          classe
-          form-control
-          #}
           id="arquivo_entrada"
           name="arquivo_entrada"
           accept=".xlsx, .xls, .csv"
-          {#
-          ACEITA
-          CSV
-          #}
           required
         />
+        <div class="file-upload-instructions">(.xlsx, .xls, .csv)</div>
+        <div id="file-name-display">Nenhum arquivo selecionado</div>
       </div>
 
-      <!-- Opções que aparecem APENAS se um CSV for selecionado -->
-      <div id="csv-options" class="mb-3" style="display: none">
-        {# Adicionado mb-3 #}
-        <h5 class="mb-3">Opções para Arquivo CSV</h5>
+      <!-- Opções CSV -->
+      <div id="csv-options" style="display: none">
+        {# Removido mb-3, espaçamento gerenciado pelo container #}
+        <h5>Opções para Arquivo CSV</h5>
         <div class="row g-3">
+          {# Mantém classes Bootstrap se estiver usando para grid #}
           <div class="col-md-4">
             <label for="csv_separator" class="form-label"
               >Separador Colunas:</label
@@ -163,48 +229,49 @@ estilos do base.html se houver #}
               <option value="latin-1">Latin-1 (ISO-8859-1)</option>
               <option value="utf-8-sig">UTF-8 c/ BOM</option>
               <option value="cp1252">Windows-1252</option>
-              {# Outra comum #}
             </select>
           </div>
         </div>
       </div>
       <!-- Fim das Opções CSV -->
 
-      <div style="text-align: center; margin-top: 30px">
+      <div class="submit-button-container">
         <button type="submit" class="btn btn-primary btn-lg">
-          {# Usa classes de botão Bootstrap #}
-          <i class="fas fa-cogs me-2"></i> {# Ícone FontAwesome (se usar) #}
-          Enviar Arquivo e Mapear Etapas
+          {# Mantém classes Bootstrap se quiser #}
+          <i class="fas fa-cogs"></i> {# Mantenha se usa FontAwesome, ou
+          remova/substitua #} Processar Arquivo
         </button>
       </div>
     </form>
   </div>
 </div>
-{% endblock %} {% block scripts %} {{ super() }} {# Inclui scripts do base se
-houver #}
+{% endblock %} {% block scripts %} {{ super() }}
 <script>
   document.addEventListener("DOMContentLoaded", function () {
     const fileInput = document.getElementById("arquivo_entrada");
     const csvOptionsDiv = document.getElementById("csv-options");
+    const fileNameDisplay = document.getElementById("file-name-display"); // Elemento para mostrar nome
 
-    if (fileInput && csvOptionsDiv) {
-      // Verifica se ambos elementos existem
+    if (fileInput && csvOptionsDiv && fileNameDisplay) {
       fileInput.addEventListener("change", function () {
         const filename = fileInput.value.toLowerCase();
-        if (filename.endsWith(".csv")) {
-          csvOptionsDiv.style.display = "block"; // Mostra opções
-          // Você pode decidir tornar os selects obrigatórios ou não aqui
-          // csvOptionsDiv.querySelectorAll('select').forEach(sel => sel.required = true);
-          console.log("CSV selecionado, mostrando opções.");
+        const justFileName = fileInput.value.split(/(\\|\/)/g).pop(); // Pega só o nome do arquivo
+
+        if (justFileName) {
+          fileNameDisplay.textContent = justFileName;
         } else {
-          csvOptionsDiv.style.display = "none"; // Esconde opções
-          // csvOptionsDiv.querySelectorAll('select').forEach(sel => sel.required = false);
-          console.log("Arquivo não CSV selecionado, escondendo opções.");
+          fileNameDisplay.textContent = "Nenhum arquivo selecionado";
+        }
+
+        if (filename.endsWith(".csv")) {
+          csvOptionsDiv.style.display = "block";
+        } else {
+          csvOptionsDiv.style.display = "none";
         }
       });
     } else {
       console.error(
-        "Elemento de input de arquivo ou container de opções CSV não encontrado."
+        "Elementos de UI (input, opções CSV ou display de nome) não encontrados."
       );
     }
   });
