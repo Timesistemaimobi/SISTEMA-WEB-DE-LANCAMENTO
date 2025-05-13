@@ -1,31 +1,120 @@
-{% extends "base.html" %} {% block title %}Importação SIENGE - Lote (Seleção){%
-endblock %} {% block content %}
-<h1>Importação SIENGE - Lote</h1>
-<p>Selecione a planilha Excel (.xlsx ou .xls) do loteamento.</p>
+{# templates/importacao_sienge_lote.html #}
+{% extends "base.html" %}
 
-<form
-  action="{{ url_for('upload_file_sienge_lote') }}"
-  method="post"
-  enctype="multipart/form-data"
-  class="tool-form"
->
-  <div class="form-group">
-    <label for="arquivo_entrada">Planilha de Entrada:</label>
-    <input
-      type="file"
-      id="arquivo_entrada"
-      name="arquivo_entrada"
-      accept=".xlsx, .xls"
-      required
-    />
-    <small
-      >Certifique-se que a planilha contém as colunas: ETAPA, QUADRA, LOTE,
-      ÁREA(M2), FRAÇÃO IDEAL (após padronização).</small
-    >
+{% block title %}Importação SIENGE - Loteamento{% endblock %}
+
+{% block styles %}
+{{ super() }}
+{# Não são necessários estilos CSS específicos aqui se tudo foi movido para styles.css
+   e as classes reutilizadas são suficientes.
+#}
+{% endblock %}
+
+{% block content %}
+<div class="container page-container">
+  <h1>Importação - SIENGE LOTE</h1>
+
+  <div class="tool-description-box"> {# REUTILIZA A CLASSE #}
+    <p>
+      <strong>Instruções:</strong> Faça o upload da sua planilha Excel (<code>.xlsx</code>, <code>.xls</code>)
+      contendo os dados das unidades do loteamento exportados do SIENGE.
+    </p>
+    <p>
+      A ferramenta irá ler o arquivo para identificar as diferentes <strong>ETAPAS</strong> presentes na planilha.
+      Em seguida, você será direcionado para uma tela onde poderá mapear cada etapa do arquivo para um código de empreendimento correspondente.
+    </p>
+    <p>
+      <small>Certifique-se que a planilha contém as colunas esperadas: <strong>ETAPA</strong>, <strong>QUADRA</strong>, <strong>LOTE</strong>, <strong>ÁREA(M2)</strong>, e <strong>FRAÇÃO IDEAL</strong>.</small>
+    </p>
   </div>
 
-  <button type="submit" class="full-width" style="margin-top: 25px">
-    Carregar Etapas para Mapeamento
-  </button>
-</form>
+  {# Mensagens Flash já são tratadas pelo base.html #}
+
+  <div class="upload-form-section"> {# REUTILIZA A CLASSE #}
+    <h2>Arquivo de Entrada</h2>
+    <form
+      method="post"
+      enctype="multipart/form-data"
+      action="{{ url_for('upload_file_sienge_lote') }}" {# Rota correta para o upload do Sienge Lote #}
+      id="uploadFormSiengeLote" {# ID único para o formulário #}
+    >
+      {{ form.csrf_token if form and form.csrf_token }}
+
+      <div class="file-input-wrapper"> {# REUTILIZA A CLASSE #}
+        <label
+          for="arquivo_entrada_sienge_lote" {# ID DIFERENTE para o input/label #}
+          class="custom-file-upload" {# REUTILIZA A CLASSE #}
+          id="fileUploadLabelSiengeLote" {# ID DIFERENTE para o JS #}
+        >
+          <span class="upload-icon">
+            {# Ícone SVG de Upload (mesmo dos outros) #}
+            <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="feather feather-upload-cloud">
+              <polyline points="16 16 12 12 8 16"></polyline><line x1="12" y1="12" x2="12" y2="21"></line><path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3"></path><polyline points="16 16 12 12 8 16"></polyline>
+            </svg>
+          </span>
+          <span class="upload-text">Clique para escolher a planilha SIENGE Lote</span>
+          <span class="upload-hint">
+            Planilha Excel (.xlsx, .xls)
+          </span>
+        </label>
+        <input
+          type="file"
+          id="arquivo_entrada_sienge_lote" {# ID DIFERENTE #}
+          name="arquivo_entrada" {# O name DEVE ser o mesmo que o Flask espera #}
+          accept=".xlsx, .xls" {# Aceita apenas Excel para esta ferramenta específica #}
+          required
+          class="hidden-file-input" {# Adiciona classe para esconder #}
+        />
+        <div id="file-name-display-sienge-lote" class="file-name-display">Nenhum arquivo selecionado</div> {# ID DIFERENTE, classe comum #}
+      </div>
+
+      <div class="submit-button-wrapper"> {# REUTILIZA A CLASSE #}
+        <button type="submit" class="btn btn-primary btn-lg"> {# Reutiliza classes de botão #}
+          <i class="fas fa-layer-group"></i> {# Ícone diferente, ex: para etapas/camadas #}
+          Carregar Etapas para Mapeamento
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  const fileInput = document.getElementById('arquivo_entrada_sienge_lote'); // ID específico
+  const fileNameDisplay = document.getElementById('file-name-display-sienge-lote');
+  const fileUploadLabel = document.getElementById('fileUploadLabelSiengeLote');
+
+  if (fileInput && fileNameDisplay) {
+    fileInput.addEventListener('change', function() {
+      if (fileInput.files.length > 0) {
+        fileNameDisplay.textContent = fileInput.files[0].name;
+      } else {
+        fileNameDisplay.textContent = 'Nenhum arquivo selecionado';
+      }
+    });
+  }
+
+  if (fileUploadLabel) { // JS para drag & drop (mantém consistência)
+    fileUploadLabel.addEventListener('dragover', function(event) {
+      event.preventDefault();
+      fileUploadLabel.classList.add('dragging');
+    });
+    fileUploadLabel.addEventListener('dragleave', function() {
+      fileUploadLabel.classList.remove('dragging');
+    });
+    fileUploadLabel.addEventListener('drop', function(event) {
+      event.preventDefault();
+      fileUploadLabel.classList.remove('dragging');
+      // if (event.dataTransfer.files.length > 0) {
+      //   fileInput.files = event.dataTransfer.files;
+      //   const changeEvent = new Event('change');
+      //   fileInput.dispatchEvent(changeEvent);
+      // }
+    });
+  }
+});
+</script>
 {% endblock %}
