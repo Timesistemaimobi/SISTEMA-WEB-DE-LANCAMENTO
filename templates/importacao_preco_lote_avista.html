@@ -1,103 +1,123 @@
-{# templates/importacao_preco_lote_avista.html #} {% extends 'base.html' %} {%
-block title %}Importar Tabela Preço - Lote à Vista{% endblock %} {% block styles
-%} {{ super() }} {# Copiando estilos dos outros templates para consistência #}
-<style>
-  .description {
-    background-color: #495057;
-    color: #dee2e6;
-    border: 1px solid #495057;
-    padding: 15px;
-    border-radius: 6px;
-    margin-bottom: 25px;
-    font-size: 0.95em;
-    line-height: 1.5;
-  }
-  .form-container {
-    max-width: 600px;
-    margin: 20px auto;
-    padding: 25px;
-    background-color: #495057;
-    border: 1px solid #dee2e6;
-    border-radius: 8px;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
-  }
-</style>
-{% endblock %} {% block content %}
-<div class="container mt-4">
-  <h1>Importar Tabela de Preço - Lote à Vista</h1>
+{# templates/importacao_preco_lote_avista.html #}
+{% extends 'base.html' %}
 
-  <div class="description">
+{% block title %}Importar Preço - Lote à Vista{% endblock %}
+
+{% block styles %}
+{{ super() }}
+{# Não são necessários estilos CSS específicos aqui se tudo foi movido para styles.css
+   e as classes reutilizadas são suficientes.
+#}
+{% endblock %}
+
+{% block content %}
+<div class="container page-container">
+  <h1>Importar Preço - Lote à Vista</h1>
+
+  <div class="tool-description-box"> {# REUTILIZA A CLASSE #}
     <p>
-      <strong>Instruções:</strong> Faça o upload da planilha Excel (.xlsx, .xls)
-      contendo os preços de Lote para pagamento à vista. A ferramenta irá
-      processá-la e gerar um novo arquivo <strong>CSV</strong> formatado.
+      <strong>Instruções:</strong> Faça o upload da sua planilha Excel (<code>.xlsx</code>, <code>.xls</code>)
+      contendo os preços de Lotes para pagamento à vista.
     </p>
     <p>
-      Certifique-se que a planilha contém colunas como
-      <strong>QUADRA</strong> (ou Bloco), <strong>LOTE</strong> (ou Unidade), e
-      <strong>VALOR À VISTA</strong> (ou similar).
+      A ferramenta irá processar a planilha, identificar as colunas de <strong>QUADRA</strong> (ou Bloco),
+      <strong>LOTE</strong> (ou Unidade), e o <strong>VALOR À VISTA</strong> para gerar um arquivo <code>.csv</code>
+      padronizado para importação.
+    </p>
+    <p>
+      <small>Certifique-se que o cabeçalho da planilha seja claro para que a ferramenta possa localizar as informações corretamente.</small>
     </p>
   </div>
 
-  {# Bloco para exibir mensagens flash #} {% with messages =
-  get_flashed_messages(with_categories=true) %} {% if messages %} {% for
-  category, message in messages %}
-  <div
-    class="alert alert-{{ category if category != 'message' else 'info' }} alert-dismissible fade show"
-    role="alert"
-  >
-    {{ message }}
-    <button
-      type="button"
-      class="btn-close"
-      data-bs-dismiss="alert"
-      aria-label="Close"
-    ></button>
-  </div>
-  {% endfor %} {% endif %} {% endwith %}
+  {# Mensagens Flash já são tratadas pelo base.html #}
 
-  <div class="form-container">
-    {# Aponta para a rota correta #}
+  <div class="upload-form-section"> {# REUTILIZA A CLASSE #}
+    <h2>Arquivo de Entrada</h2>
     <form
       method="post"
       enctype="multipart/form-data"
       action="{{ url_for('importacao_preco_lote_avista_tool') }}"
+      id="uploadFormPrecoLoteAv" {# ID único para o formulário #}
     >
-      <div class="mb-3">
-        <label for="arquivo_entrada_lote_av" class="form-label"
-          ><strong
-            >Selecione o Arquivo ({% for ext in ALLOWED_EXTENSIONS %}.{{ ext
-            }}{% if not loop.last %}, {% endif %}{% endfor %}):</strong
-          ></label
+      {{ form.csrf_token if form and form.csrf_token }}
+
+      <div class="file-input-wrapper"> {# REUTILIZA A CLASSE #}
+        <label
+          for="arquivo_entrada_preco_lote_av" {# ID DIFERENTE para o input/label #}
+          class="custom-file-upload" {# REUTILIZA A CLASSE #}
+          id="fileUploadLabelPrecoLoteAv" {# ID DIFERENTE para o JS #}
         >
-        {# Input de arquivo padrão #}
+          <span class="upload-icon">
+            {# Ícone SVG de Upload (mesmo dos formatadores) #}
+            <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="feather feather-upload-cloud">
+              <polyline points="16 16 12 12 8 16"></polyline><line x1="12" y1="12" x2="12" y2="21"></line><path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3"></path><polyline points="16 16 12 12 8 16"></polyline>
+            </svg>
+          </span>
+          <span class="upload-text">Clique para escolher um arquivo</span>
+          <span class="upload-hint">
+            Planilha Excel ({% for ext in ALLOWED_EXTENSIONS %}.{{ ext }}{% if not loop.last %}, {% endif %}{% endfor %})
+          </span>
+        </label>
         <input
           type="file"
-          class="form-control"
-          id="arquivo_entrada_lote_av"
-          name="arquivo_entrada"
+          id="arquivo_entrada_preco_lote_av" {# ID DIFERENTE #}
+          name="arquivo_entrada" {# O name DEVE ser o mesmo que o Flask espera #}
           accept="{% for ext in ALLOWED_EXTENSIONS %}.{{ ext }}{% if not loop.last %},{% endif %}{% endfor %}"
           required
+          class="hidden-file-input" {# Adiciona classe para esconder #}
         />
-        <div class="form-text">
-          Faça upload da planilha <strong>Excel</strong> de preços de Lote à
-          Vista. A saída será um arquivo <strong>.csv</strong>.
-        </div>
+        <div id="file-name-display-preco-lote-av" class="file-name-display">Nenhum arquivo selecionado</div> {# ID DIFERENTE, classe comum #}
       </div>
 
-      <div style="text-align: center; margin-top: 30px">
-        <button type="submit" class="btn btn-primary btn-lg">
-          <i class="fas fa-upload me-2"></i> Importar e Processar
+      <div class="submit-button-wrapper"> {# REUTILIZA A CLASSE #}
+        <button type="submit" class="btn btn-primary btn-lg"> {# Reutiliza classes de botão #}
+          <i class="fas fa-dollar-sign"></i> {# Ícone diferente, ex: para preço/dinheiro #}
+          Importar e Processar
         </button>
-        <a
-          href="{{ url_for('home') }}"
-          class="btn btn-secondary btn-lg"
-          style="margin-left: 10px"
-          >Cancelar</a
-        >
+        {# O botão Cancelar geralmente não é necessário se o menu de navegação é claro #}
+        {# <a href="{{ url_for('home') }}" class="btn btn-outline-secondary btn-lg" style="margin-left: 10px;">Cancelar</a> #}
       </div>
     </form>
   </div>
 </div>
-{% endblock %} {% block scripts %} {{ super() }} {# Nenhum script JS específico
-necessário para este upload simples #} {% endblock %}
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  const fileInput = document.getElementById('arquivo_entrada_preco_lote_av'); // Usa o ID específico
+  const fileNameDisplay = document.getElementById('file-name-display-preco-lote-av');
+  const fileUploadLabel = document.getElementById('fileUploadLabelPrecoLoteAv');
+
+  if (fileInput && fileNameDisplay) {
+    fileInput.addEventListener('change', function() {
+      if (fileInput.files.length > 0) {
+        fileNameDisplay.textContent = fileInput.files[0].name;
+      } else {
+        fileNameDisplay.textContent = 'Nenhum arquivo selecionado';
+      }
+    });
+  }
+
+  if (fileUploadLabel) { // JS para drag & drop (mantém consistência)
+    fileUploadLabel.addEventListener('dragover', function(event) {
+      event.preventDefault();
+      fileUploadLabel.classList.add('dragging');
+    });
+    fileUploadLabel.addEventListener('dragleave', function() {
+      fileUploadLabel.classList.remove('dragging');
+    });
+    fileUploadLabel.addEventListener('drop', function(event) {
+      event.preventDefault();
+      fileUploadLabel.classList.remove('dragging');
+      // if (event.dataTransfer.files.length > 0) {
+      //   fileInput.files = event.dataTransfer.files;
+      //   const changeEvent = new Event('change');
+      //   fileInput.dispatchEvent(changeEvent);
+      // }
+    });
+  }
+});
+</script>
+{% endblock %}
