@@ -1,55 +1,118 @@
-{% extends "base.html" %} {% block title %}Formatador - Lote{% endblock %} {%
-block content %}
-<h1>Formatador - Lote</h1>
-<p>
-  Esta ferramenta processa uma planilha de loteamento para padronizar dados e
-  adicionar informações.
-</p>
-<ol>
-  <li>
-    Identifica linhas "QUADRA X" / "BLOCO Y" e cabeçalhos ("LOTE", "TIPO", etc.)
-    após elas.
-  </li>
-  <li>Adiciona/Formata coluna "QUADRA" (com valor numérico se possível).</li>
-  <li>
-    Formata colunas de medidas (Área, Testada, Fundo, Laterais) para "XX,XX
-    m/m²".
-  </li>
-  <li>
-    Adiciona prefixo "LT " à coluna Lote e outras especificadas, se necessário.
-  </li>
-  <li>Adiciona coluna "ETAPA" com valor fixo 1.</li>
-  <li>Constrói coluna "CONFRONTANTES".</li>
-  <li>Calcula e adiciona coluna "FRAÇÃO IDEAL".</li>
-  <li>Reordena colunas e salva como novo arquivo .xlsx com cabeçalho.</li>
-</ol>
+{# templates/formatador_lote.html #}
+{% extends "base.html" %}
 
-<form
-  action="{{ url_for('formatador_lote_tool') }}"
-  method="post"
-  enctype="multipart/form-data"
-  class="tool-form"
->
-  <h2>Arquivo de Entrada</h2>
-  <div class="form-group">
-    <label for="arquivo_entrada"
-      >Selecione a planilha Excel (.xlsx, .xls):</label
-    >
-    <input
-      type="file"
-      id="arquivo_entrada"
-      name="arquivo_entrada"
-      accept=".xlsx, .xls"
-      required
-    />
-    <small
-      >A ferramenta espera encontrar "QUADRA/BLOCO" na coluna A e um cabeçalho
-      com "LOTE", "ÁREA(M2)", etc., abaixo.</small
-    >
+{% block title %}Formatador de Loteamento{% endblock %}
+
+{% block styles %}
+{{ super() }}
+{# Não são necessários estilos CSS específicos aqui se tudo foi movido para styles.css #}
+{# Apenas se houver alguma variação MUITO pequena SÓ para esta página #}
+{% endblock %}
+
+{% block content %}
+<div class="container page-container">
+  <h1>Formatador - Loteamento</h1>
+
+  <div class="tool-description-box"> {# USA A MESMA CLASSE #}
+    <p>Esta ferramenta processa uma planilha de loteamento para padronizar dados, adicionar informações calculadas e formatar a saída.</p>
+    <p><strong>Principais Funcionalidades:</strong></p>
+    <ol> {# USA A MESMA ESTRUTURA DE LISTA #}
+      <li>Identifica seções de "<b>QUADRA X</b>" / "<b>BLOCO Y</b>" e os cabeçalhos de dados subsequentes (ex: "LOTE", "TIPO", "ÁREA(M²)").</li>
+      <li>Cria ou formata a coluna "<b>QUADRA</b>" (ou "BLOCO") com o valor numérico detectado (ex: 01, 02).</li>
+      <li>Formata colunas de medidas (Área, Testada, Fundo, Laterais) para o padrão "<b>XX,XX m</b>" ou "<b>XX,XX m²</b>".</li>
+      <li>Adiciona prefixo "<b>LT </b>" à coluna "LOTE" e outras colunas de confrontantes, se aplicável.</li>
+      <li>Adiciona uma coluna "<b>ETAPA</b>" com o valor fixo "01".</li>
+      <li>Constrói uma coluna detalhada de "<b>CONFRONTANTES</b>".</li>
+      <li>Calcula e adiciona a coluna "<b>FRAÇÃO IDEAL</b>" para cada lote.</li>
+      <li>Reordena as colunas para um layout padronizado e salva o resultado em um novo arquivo <b>.xlsx</b>.</li>
+    </ol>
+    {# Removida a nota <small> daqui para manter a estrutura idêntica,
+       mas você pode adicionar um <p> similar ao do incorporacao se quiser. #}
   </div>
 
-  <button type="submit" class="full-width" style="margin-top: 25px">
-    Processar e Baixar Planilha Formatada (.xlsx)
-  </button>
-</form>
+  <div class="upload-form-section"> {# USA A MESMA CLASSE #}
+    <h2>Arquivo de Entrada</h2>
+    <form
+      action="{{ url_for('formatador_lote_tool') }}"
+      method="post"
+      enctype="multipart/form-data"
+      id="uploadFormLote" {# Mantenha ID único se o JS for específico #}
+    >
+      {{ form.csrf_token if form and form.csrf_token }}
+
+      <div class="file-input-wrapper"> {# USA A MESMA CLASSE #}
+        <label
+          for="arquivo_entrada_lote" {# ID DIFERENTE para o input se o JS precisar #}
+          class="custom-file-upload" {# USA A MESMA CLASSE #}
+          id="fileUploadLabelLote" {# ID DIFERENTE para o JS #}
+        >
+          <span class="upload-icon">
+            {# Ícone SVG de Upload (mesmo do incorporacao) #}
+            <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="feather feather-upload-cloud">
+              <polyline points="16 16 12 12 8 16"></polyline><line x1="12" y1="12" x2="12" y2="21"></line><path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3"></path><polyline points="16 16 12 12 8 16"></polyline>
+            </svg>
+          </span>
+          <span class="upload-text">Clique para escolher um arquivo</span>
+          <span class="upload-hint">Planilha Excel (.xlsx, .xls)</span>
+        </label>
+        <input
+          type="file"
+          id="arquivo_entrada_lote" {# ID DIFERENTE #}
+          name="arquivo_entrada" {# O name="arquivo_entrada" DEVE ser o mesmo que o Flask espera #}
+          accept=".xlsx, .xls"
+          required
+          class="hidden-file-input" {# Adiciona classe para esconder #}
+        />
+        <div id="file-name-display-lote" class="file-name-display">Nenhum arquivo selecionado</div> {# ID DIFERENTE, classe comum #}
+      </div>
+
+      <div class="submit-button-wrapper"> {# USA A MESMA CLASSE #}
+        <button type="submit" class="btn btn-primary btn-lg"> {# Reutiliza classes de botão #}
+          <i class="fas fa-sync-alt"></i> {# Ícone FontAwesome (ou remova/substitua) #}
+          Processar e Baixar Planilha
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  const fileInputLote = document.getElementById('arquivo_entrada_lote'); // Usa o ID específico
+  const fileNameDisplayLote = document.getElementById('file-name-display-lote');
+  const fileUploadLabelLote = document.getElementById('fileUploadLabelLote');
+
+  if (fileInputLote && fileNameDisplayLote) {
+    fileInputLote.addEventListener('change', function() {
+      if (fileInputLote.files.length > 0) {
+        fileNameDisplayLote.textContent = fileInputLote.files[0].name;
+      } else {
+        fileNameDisplayLote.textContent = 'Nenhum arquivo selecionado';
+      }
+    });
+  }
+
+  if (fileUploadLabelLote) { // JS para drag & drop (mantém consistência)
+    fileUploadLabelLote.addEventListener('dragover', function(event) {
+      event.preventDefault();
+      fileUploadLabelLote.classList.add('dragging');
+    });
+    fileUploadLabelLote.addEventListener('dragleave', function() {
+      fileUploadLabelLote.classList.remove('dragging');
+    });
+    fileUploadLabelLote.addEventListener('drop', function(event) {
+      event.preventDefault();
+      fileUploadLabelLote.classList.remove('dragging');
+      // if (event.dataTransfer.files.length > 0) {
+      //   fileInputLote.files = event.dataTransfer.files;
+      //   const changeEvent = new Event('change');
+      //   fileInputLote.dispatchEvent(changeEvent);
+      // }
+    });
+  }
+});
+</script>
 {% endblock %}
