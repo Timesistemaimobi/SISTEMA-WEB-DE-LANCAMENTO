@@ -1,21 +1,168 @@
-{% extends "base.html" %} {% block title %}Bem-vindo{% endblock %} {% block
-content %}
-<div style="text-align: center; padding: 40px 0">
-  <img
-    src="{{ url_for('static', filename='images/vca.png') }}"
-    alt="Logo VCA"
-    style="max-width: 300px; margin-bottom: 30px"
-  />
-  <h1>Bem-vindo às Ferramentas Automatizadas</h1>
-  <p style="font-size: 1.1em; color: #777">
-    Utilize o menu acima para selecionar a ferramenta desejada.
-  </p>
-  <p style="margin-top: 40px; color: #777">
-    Desenvolvido para otimizar processos internos.
+{# templates/home.html #} {% extends "base.html" %} {% block title %}Bem-vindo
+às Ferramentas VCA{% endblock %} {% block styles %} {{ super() }}
+<style>
+  .welcome-section {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: calc(
+      100vh - 65px - 80px
+    ); /* (Altura da viewport - navbar - padding-top do body - margem do container) - Ajuste conforme necessário */
+    text-align: center;
+    padding: 40px 20px;
+    /* background: linear-gradient(135deg, var(--vca-green-ultralight) 0%, var(--bg-body) 100%); */
+    /* Um gradiente sutil, opcional */
+  }
+
+  .welcome-logo img {
+    max-width: 280px; /* Um pouco menor para elegância */
+    margin-bottom: 40px;
+    opacity: 0; /* Para animação */
+    transform: translateY(20px); /* Para animação */
+    animation: logoFadeInUp 0.8s 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94)
+      forwards;
+  }
+
+  @keyframes logoFadeInUp {
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .welcome-section h1 {
+    font-size: 2.8rem; /* Título maior e mais impactante */
+    color: var(--vca-green-primary); /* Cor de destaque da marca */
+    margin-bottom: 15px;
+    font-weight: 700; /* Mais peso */
+    letter-spacing: -0.5px; /* Ajuste fino */
+    opacity: 0;
+    transform: translateY(20px);
+    animation: textFadeInUp 0.7s 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94)
+      forwards;
+  }
+
+  .welcome-section .subtitle {
+    font-size: 1.25rem;
+    color: var(--text-secondary);
+    margin-bottom: 35px;
+    max-width: 600px; /* Limita largura para melhor leitura */
+    line-height: 1.7;
+    opacity: 0;
+    transform: translateY(20px);
+    animation: textFadeInUp 0.7s 0.7s cubic-bezier(0.25, 0.46, 0.45, 0.94)
+      forwards;
+  }
+
+  @keyframes textFadeInUp {
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .welcome-cta {
+    /* Chamada para ação implícita */
+    margin-top: 20px; /* Espaço após subtítulo */
+    opacity: 0;
+    transform: translateY(20px);
+    animation: textFadeInUp 0.7s 0.9s cubic-bezier(0.25, 0.46, 0.45, 0.94)
+      forwards;
+  }
+
+  .welcome-cta p {
+    font-size: 1rem;
+    color: var(--text-secondary);
+  }
+
+  .welcome-cta .menu-hint {
+    /* Para o ícone de menu */
+    font-size: 1.5rem; /* Tamanho do ícone */
+    color: var(--vca-green-primary);
+    display: inline-block;
+    margin: 0 8px;
+    animation: bounceHint 2s infinite 1.5s; /* Animação de "pulo" sutil */
+  }
+
+  @keyframes bounceHint {
+    0%,
+    20%,
+    50%,
+    80%,
+    100% {
+      transform: translateY(0);
+    }
+    40% {
+      transform: translateY(-5px);
+    }
+    60% {
+      transform: translateY(-2px);
+    }
+  }
+
+  .footer-credits {
+    margin-top: 60px; /* Mais espaço antes dos créditos */
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    opacity: 0.7;
+    opacity: 0; /* Para animação */
+    transform: translateY(20px); /* Para animação */
+    animation: textFadeInUp 0.7s 1.1s cubic-bezier(0.25, 0.46, 0.45, 0.94)
+      forwards;
+  }
+  .footer-credits strong {
+    color: var(--text-primary); /* Destaque para o nome do grupo */
+    font-weight: 500;
+  }
+
+  /* Ajustes para telas menores */
+  @media (max-width: 768px) {
+    .welcome-section h1 {
+      font-size: 2.2rem;
+    }
+    .welcome-section .subtitle {
+      font-size: 1.1rem;
+    }
+    .welcome-logo img {
+      max-width: 220px;
+    }
+    .welcome-section {
+      min-height: calc(
+        100vh - 60px - 40px
+      ); /* Ajusta altura para navbar mobile */
+    }
+  }
+</style>
+{% endblock %} {% block content %}
+<div class="welcome-section">
+  <div class="welcome-logo">
+    <img
+      src="{{ url_for('static', filename='images/vca.png') }}"
+      alt="Logo VCA Construtora"
+    />
+  </div>
+
+  <h1>Ferramentas Automatizadas VCA</h1>
+  <p class="subtitle">
+    Soluções inteligentes para otimizar seus processos internos e impulsionar a
+    produtividade.
   </p>
 
-  <p style="margin-top: 40px; color: #777">
-    Developed By: Grupo do Sistema - VCA Construtora<br />
-  </p>
+  <div class="welcome-cta">
+    <p>
+      Explore as opções no menu
+      <span class="menu-hint" title="Menu de Navegação">☰</span> {# Ou use um
+      ícone SVG/FontAwesome aqui #} acima para começar.
+    </p>
+  </div>
+
+  <div class="footer-credits">
+    <p>
+      Desenvolvido com
+      <span style="color: var(--vca-green-primary); font-size: 1.2em">♥</span>
+      por <strong>Grupo do Sistema - VCA Construtora</strong>
+    </p>
+  </div>
 </div>
 {% endblock %}
