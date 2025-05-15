@@ -878,3 +878,385 @@ tbody tr:hover {
     font-size: 0.95rem;
   }
 }
+
+.upload-tool-card {
+  border-left: 7px solid var(--vca-green-primary); /* Borda lateral mais grossa e vibrante */
+  background-color: var(
+    --bg-container
+  ); /* Garante que o card use a cor de container correta */
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15); /* Sombra mais suave e difundida */
+  /* No modo escuro, a sombra pode ser mais sutil ou baseada em realce de borda */
+}
+@media (prefers-color-scheme: dark) {
+  .upload-tool-card {
+    box-shadow: 0 0 0 1px var(--border-color-strong),
+      0 4px 12px rgba(0, 0, 0, 0.3); /* Efeito de borda + sombra */
+  }
+}
+
+.upload-tool-card .card-header {
+  background: var(--vca-green-primary); /* Fundo verde sólido e vibrante */
+  /* Removido o gradiente para um visual mais flat e moderno aqui */
+  color: var(--text-light); /* Texto escuro no fundo verde para contraste */
+  border-bottom: 2px solid var(--vca-green-dark); /* Linha inferior mais escura do mesmo tom */
+  padding: 20px 25px;
+  text-align: center; /* Centraliza o título do card */
+}
+.upload-tool-card .card-header h2 {
+  font-size: 1.6rem;
+  font-weight: 700;
+  color: var(--text-light); /* Garante que o texto do h2 seja escuro */
+  text-shadow: none; /* Remove sombra de texto se o fundo for sólido */
+  margin: 0;
+}
+.upload-tool-card .card-header h2 i {
+  display: none; /* Esconde o ícone do header, o título é o foco */
+}
+
+.upload-tool-card .card-body {
+  padding: 30px 35px; /* Mais padding horizontal */
+}
+
+.upload-tool-card .card-body .lead {
+  font-size: 1.05rem;
+  color: var(--text-secondary);
+  text-align: center;
+  margin-bottom: 30px;
+  padding-bottom: 0; /* Remove a borda pontilhada */
+  border-bottom: none;
+}
+
+.upload-tool-card .form-group {
+  margin-bottom: 30px;
+}
+.upload-tool-card label[for="arquivo_entrada"] strong {
+  /* Label "Selecione o arquivo CSV:" */
+  display: block; /* Para ocupar a largura total */
+  text-align: center; /* Centraliza */
+  font-size: 1.2rem; /* Maior */
+  color: var(--text-primary);
+  font-weight: 600;
+  margin-bottom: 15px; /* Espaço antes da área de drop */
+}
+
+/* Input de Arquivo Customizado - Refinamento Estético */
+.upload-tool-card .custom-file-upload {
+  /* O label que parece um input */
+  border: 3px dashed var(--border-color-strong); /* Borda pontilhada mais grossa */
+  border-radius: 12px; /* Mais arredondado */
+  padding: 40px 25px;
+  background-color: var(
+    --bg-input-dark
+  ); /* Fundo distinto para a área de drop */
+  transition: var(--transition-normal);
+  /* cursor, display: block, text-align: center (já definidos) */
+}
+.upload-tool-card .custom-file-upload:hover,
+.upload-tool-card .custom-file-upload.dragging {
+  border-color: var(--vca-green-primary);
+  border-style: solid;
+  background-color: var(
+    --vca-green-light-dark-theme
+  ); /* Usar a variável para modo escuro */
+  box-shadow: 0 0 25px var(--vca-green-ultralight-dark-theme); /* Glow suave com cor VCA */
+}
+@media (prefers-color-scheme: light) {
+  /* Ajuste para modo claro */
+  .upload-tool-card .custom-file-upload:hover,
+  .upload-tool-card .custom-file-upload.dragging {
+    background-color: var(--vca-green-ultralight);
+    box-shadow: 0 0 25px rgba(104, 201, 0, 0.2);
+  }
+}
+
+.upload-tool-card .custom-file-upload .upload-icon i {
+  font-size: 3.5rem; /* Ícone maior */
+  color: var(--vca-green-primary);
+  margin-bottom: 20px;
+  /* transition (já definida) */
+}
+.upload-tool-card .custom-file-upload:hover .upload-icon i {
+  transform: scale(1.15) translateY(-5px) rotate(5deg); /* Animação mais expressiva */
+  color: var(--vca-green-dark);
+}
+.upload-tool-card .custom-file-upload .upload-text {
+  font-size: 1.1rem; /* Texto principal da área de drop maior */
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 8px;
+}
+.upload-tool-card .custom-file-upload .upload-hint {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  font-style: italic;
+}
+
+.upload-tool-card .file-name-display {
+  margin-top: 20px;
+  text-align: center;
+  font-size: 0.95rem;
+  color: var(--text-secondary);
+  font-weight: 500;
+  padding: 8px;
+  background-color: var(--bg-input-dark);
+  border-radius: 6px;
+  min-height: 2em; /* Para manter o espaço mesmo quando vazio */
+  border: 1px solid var(--border-color);
+}
+
+.upload-tool-card .form-text {
+  /* Texto de ajuda sobre colunas */
+  font-size: 0.85rem;
+  padding: 15px;
+  background-color: var(--bg-input-dark);
+  border-radius: 8px;
+  border: 1px solid var(--border-color);
+  color: var(--text-secondary);
+  line-height: 1.6;
+  margin-top: 25px; /* Mais espaço acima */
+  text-align: left; /* Alinha à esquerda para melhor leitura de listas */
+}
+.upload-tool-card .form-text strong {
+  color: var(--text-primary); /* Destaque para os nomes das colunas */
+}
+
+/* Botão de Submit na página de upload */
+.upload-tool-card .submit-button-wrapper {
+  margin-top: 35px; /* Mais espaço acima do botão */
+}
+.upload-tool-card button[type="submit"] {
+  /* Seu estilo global para button[type="submit"] já é bom com o gradiente. */
+  /* Vamos garantir que ele se destaque bem e use as variáveis corretas. */
+  background: linear-gradient(
+    to right,
+    var(--vca-green-primary),
+    var(--vca-green-dark)
+  );
+  color: var(--text-light); /* Texto escuro no botão verde */
+  padding: 16px 45px; /* Botão bem generoso */
+  font-size: 1.15rem;
+  font-weight: 700; /* Mais forte */
+  border-radius: 50px; /* Totalmente arredondado */
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1); /* Sombra inicial */
+  transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1); /* Transição mais suave */
+}
+.upload-tool-card button[type="submit"]:hover {
+  background: linear-gradient(
+    to right,
+    var(--vca-green-dark),
+    var(--vca-green-primary)
+  ); /* Inverte gradiente */
+  box-shadow: 0 6px 20px rgba(104, 201, 0, 0.3); /* Sombra VCA mais pronunciada */
+  transform: translateY(-3px); /* Efeito de elevação */
+}
+.upload-tool-card button[type="submit"]:active {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 10px rgba(104, 201, 0, 0.2);
+}
+.upload-tool-card button[type="submit"] i {
+  margin-right: 12px;
+  transition: transform 0.3s ease;
+}
+.upload-tool-card button[type="submit"]:hover i {
+  transform: translateX(6px) rotate(15deg); /* Animação mais divertida no ícone */
+}
+
+.upload-tool-card .card-footer {
+  background-color: var(
+    --bg-input-dark
+  ); /* Fundo consistente com outros elementos "internos" */
+  border-top: 1px solid var(--border-color);
+  text-align: center; /* Centraliza o texto do rodapé */
+  padding: 15px;
+  font-style: italic;
+}
+
+.filter-tool-card {
+  border-left: 7px solid var(--vca-green-dark); /* Borda lateral com o verde mais escuro para diferenciar */
+  background-color: var(--bg-container);
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+}
+@media (prefers-color-scheme: dark) {
+  .filter-tool-card {
+    box-shadow: 0 0 0 1px var(--border-color-strong),
+      0 4px 12px rgba(0, 0, 0, 0.3);
+  }
+}
+
+.filter-tool-card .card-header {
+  /* Usar um tom um pouco diferente do upload, ou um cinza elegante */
+  background: linear-gradient(
+    135deg,
+    var(--vca-green-dark),
+    #4a7e02
+  ); /* Gradiente com verde escuro */
+  /* Ou um cinza escuro elegante: background-color: var(--bg-input-dark); */
+  color: var(--text-light);
+  border-bottom: 2px solid rgba(0, 0, 0, 0.1); /* Sutil divisão no modo claro */
+  padding: 20px 25px; /* Consistente com o upload */
+  text-align: center;
+}
+@media (prefers-color-scheme: dark) {
+  .filter-tool-card .card-header {
+    border-bottom-color: rgba(255, 255, 255, 0.05);
+  }
+}
+.filter-tool-card .card-header h2 {
+  font-size: 1.6rem;
+  font-weight: 700;
+  color: var(--text-light);
+  margin: 0;
+}
+.filter-tool-card .card-header h2 i {
+  display: none; /* Ícone pode ser desnecessário se o título é claro */
+}
+
+.filter-tool-card .card-body {
+  padding: 25px 30px; /* Ajuste de padding */
+}
+
+.filter-tool-card .card-body .lead {
+  font-size: 1.05rem;
+  color: var(--text-secondary);
+  text-align: center;
+  margin-bottom: 25px;
+  padding: 15px;
+  background-color: var(--bg-input-dark); /* Fundo sutil para o lead text */
+  border-radius: 8px;
+  border: 1px solid var(--border-color);
+}
+.filter-tool-card .card-body .lead strong {
+  /* Para o nome do arquivo */
+  color: var(--vca-green-primary); /* Destaque com o verde principal */
+  font-weight: 700;
+  /* border-bottom: none; (Removido o pontilhado, o destaque na cor é suficiente) */
+}
+
+/* Subtítulos das seções de filtro (Empreendimentos, Motivos) */
+.filter-tool-card h4.section-subtitle {
+  font-family: var(--font-primary);
+  font-size: 1.3rem; /* Um pouco maior */
+  color: var(--text-primary);
+  font-weight: 600;
+  margin-top: 35px; /* Mais espaço antes das seções */
+  margin-bottom: 20px;
+  padding-bottom: 12px;
+  border-bottom: 2px solid var(--vca-green-primary);
+  display: flex;
+  align-items: center;
+}
+.filter-tool-card h4.section-subtitle:first-of-type {
+  margin-top: 10px; /* Menos margem para o primeiro subtítulo */
+}
+.filter-tool-card h4.section-subtitle i {
+  margin-right: 12px;
+  color: var(--vca-green-primary);
+  font-size: 1.25em; /* Ícone um pouco maior */
+}
+
+/* Lista de Checkboxes para Filtros */
+.filter-tool-card .list-group.filter-list {
+  border: 1px solid var(--border-color);
+  border-radius: 10px; /* Bordas mais arredondadas para o container */
+  padding: 0; /* Remove padding do container, o padding será nos itens */
+  background-color: var(
+    --bg-container
+  ); /* Fundo igual ao card para sensação de embutido */
+  max-height: 350px;
+  overflow-y: auto;
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.05); /* Sombra interna sutil */
+}
+.filter-tool-card .list-group-item {
+  background-color: transparent;
+  border: none;
+  border-bottom: 1px solid var(--border-color); /* Linha divisória entre itens */
+  padding: 15px 20px; /* Mais padding nos itens */
+  transition: background-color var(--transition-fast),
+    border-left-color var(--transition-fast);
+  cursor: pointer; /* O label inteiro é clicável */
+}
+.filter-tool-card .list-group-item:last-child {
+  border-bottom: none;
+}
+.filter-tool-card .list-group-item:hover {
+  background-color: var(
+    --vca-green-ultralight-dark-theme
+  ); /* Usar a variável de tema escuro */
+  border-left: 4px solid var(--vca-green-primary); /* Borda de destaque no hover */
+  /* padding-left já tratado pelo display flex no label */
+}
+
+.button-link-base {
+  /* Você pode adicionar esta classe ao lado de .btn-outline-secondary-vca se necessário */
+  display: inline-block; /* Essencial para padding e outras propriedades de bloco */
+  text-align: center;
+  vertical-align: middle;
+  cursor: pointer;
+  user-select: none; /* Evita seleção de texto no clique */
+  text-decoration: none; /* Remove sublinhado de link */
+  transition: var(--transition-normal); /* Sua variável de transição global */
+}
+
+/* Estilo específico para o botão "Voltar" ou similar (Outline VCA Secundário) */
+.btn-outline-secondary-vca {
+  display: inline-block;
+  background: linear-gradient(
+    to right,
+    var(--vca-green-primary),
+    var(--vca-green-dark)
+  );
+  color: var(--text-light);
+  padding-top: 10px;
+  padding: 12px 30px;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 1rem;
+  font-weight: 600;
+  text-align: center;
+  text-decoration: none;
+  transition: var(--transition-normal);
+  box-shadow: var(--shadow-md);
+  letter-spacing: 0.5px;
+}
+
+.btn-outline-secondary-vca:hover,
+.btn-outline-secondary-vca:focus {
+  /* No hover, ele se preenche com uma cor secundária ou um tom de verde mais suave */
+  color: var(--text-light); /* Texto claro no fundo preenchido */
+  background-color: var(
+    --text-secondary
+  ); /* Fundo com a cor do texto secundário */
+  /* Ou um verde VCA mais suave: background-color: var(--vca-green-dark); */
+  border-color: var(--text-secondary); /* Borda da mesma cor do fundo */
+  /* Ou border-color: var(--vca-green-dark); */
+
+  text-decoration: none;
+  transform: translateY(-3px);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.1); /* Sombra mais suave que o botão primário */
+  /* Se usar fundo verde no hover: box-shadow: 0 6px 20px rgba(104, 201, 0, 0.2); */
+}
+
+.btn-outline-secondary-vca:active {
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-sm);
+}
+
+.btn-outline-secondary-vca i {
+  margin-right: 10px; /* Mesmo espaçamento do ícone do botão de submit */
+  font-size: 1.1em; /* Mesmo tamanho */
+  transition: transform 0.3s ease;
+}
+
+.btn-outline-secondary-vca:hover i {
+  transform: translateX(-4px) rotate(-10deg); /* Animação um pouco diferente para distinguir */
+}
+
+.filter-tool-card .actions-footer {
+  /* ... seus outros estilos ... */
+  display: flex; /* Certifique-se de que é flex */
+  gap: 15px; /* Espaço entre os botões filhos */
+  padding-top: 15px; /* Espaço acima dos botões */
+}
