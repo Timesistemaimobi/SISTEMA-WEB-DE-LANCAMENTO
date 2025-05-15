@@ -1260,3 +1260,23 @@ tbody tr:hover {
   gap: 15px; /* Espaço entre os botões filhos */
   padding-top: 15px; /* Espaço acima dos botões */
 }
+
+.filter-tool-card .d-flex .btn-outline-info {
+  /* Seletor mais específico */
+  padding: 0.25rem 0.6rem; /* Padding menor para btn-sm */
+  font-size: 0.8rem; /* Fonte menor */
+  font-weight: 500;
+  border-color: var(--vca-green-primary); /* Borda com cor VCA */
+  color: var(--vca-green-primary); /* Texto com cor VCA */
+  background-color: transparent;
+  border-radius: 50px; /* Totalmente arredondado como os outros */
+  transition: var(--transition-fast);
+}
+
+.filter-tool-card .d-flex .btn-outline-info:hover,
+.filter-tool-card .d-flex .btn-outline-info:focus {
+  background-color: var(--vca-green-primary);
+  color: var(--text-light); /* Texto escuro no fundo verde VCA */
+  border-color: var(--vca-green-primary);
+  box-shadow: 0 0 8px var(--vca-green-ultralight-dark-theme); /* Glow sutil no hover */
+}
