@@ -1,0 +1,106 @@
+{% extends "base.html" %} {% block title %}Filtrar Unidades Bloqueadas{%
+endblock %} {% block content %}
+<div class="container mt-5 mb-5">
+  <div class="card filter-tool-card">
+    <div class="card-header">
+      <h2>
+        {# <i class="fas fa-filter"></i> Ícone opcional, pode ser removido se o
+        CSS o esconde #} Selecionar Filtros para Unidades Bloqueadas
+      </h2>
+    </div>
+    <div class="card-body">
+      <p class="lead">
+        Selecione os empreendimentos e motivos de bloqueio que você deseja
+        <strong>IGNORAR</strong> na exportação para o arquivo:
+        <strong>{{ original_filename }}</strong>.
+      </p>
+      <hr class="my-4" />
+
+      {% include '_flashes.html' %}
+
+      <form
+        method="POST"
+        action="{{ url_for('formatador_unidades_bloqueadas_tool_processar') }}"
+      >
+        <div class="row">
+          <div class="col-md-6 mb-4">
+            <h4 class="section-subtitle">
+              {# Classe para estilização do subtítulo #}
+              <i class="fas fa-building"></i>Empreendimentos a Ignorar:
+            </h4>
+            {% if empreendimentos_unicos %}
+            <div class="list-group filter-list">
+              {# Classe para estilização da lista #} {% for emp in
+              empreendimentos_unicos %}
+              <label class="list-group-item">
+                <input
+                  class="form-check-input"
+                  {#
+                  Estilo
+                  global
+                  para
+                  checkbox
+                  #}
+                  type="checkbox"
+                  name="ignorar_empreendimento"
+                  value="{{ emp }}"
+                  id="emp-{{ loop.index }}"
+                />
+                <span>{{ emp }}</span> {# Texto do label agora em um span #}
+              </label>
+              {% endfor %}
+            </div>
+            {% else %}
+            <div class="alert alert-info mt-3" role="alert">
+              {# Adicionado mt-3 #} Nenhum empreendimento distinto encontrado no
+              arquivo para filtrar.
+            </div>
+            {% endif %}
+          </div>
+          <div class="col-md-6 mb-4">
+            <h4 class="section-subtitle">
+              <i class="fas fa-ban"></i>Motivos de Bloqueio a Ignorar:
+            </h4>
+            {% if motivos_unicos %}
+            <div class="list-group filter-list">
+              {% for motivo in motivos_unicos %}
+              <label class="list-group-item">
+                <input
+                  class="form-check-input"
+                  type="checkbox"
+                  name="ignorar_motivo"
+                  value="{{ motivo }}"
+                  id="motivo-{{ loop.index }}"
+                />
+                <span>{{ motivo }}</span>
+              </label>
+              {% endfor %}
+            </div>
+            {% else %}
+            <div class="alert alert-info mt-3" role="alert">
+              Nenhum motivo de bloqueio distinto encontrado no arquivo para
+              filtrar.
+            </div>
+            {% endif %}
+          </div>
+        </div>
+
+        {# Movido para uma div separada para melhor controle de layout e borda
+        #}
+        <div class="actions-footer">
+          <a
+            href="{{ url_for('formatador_unidades_bloqueadas_tool') }}"
+            class="btn-outline-secondary-vca btn-lg"
+          >
+            <i class="fas fa-arrow-left"></i>Voltar (Novo Upload)
+          </a>
+          <button type="submit" class="btn-lg">
+            <i class="fas fa-file-excel"></i>Gerar Planilha Filtrada
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %} {% block scripts %} {{ super() }} {# Scripts específicos para
+esta página, se houver no futuro #} {% endblock %}
