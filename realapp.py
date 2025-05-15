@@ -26,7 +26,12 @@ from formatadores.tabela_preco_importador import (
     processar_preco_lote_parcelado
 )
 from formatadores.incorporacao_formatador import processar_incorporacao_web
+from formatadores.tabela_unidades_bloqueadas import ler_csv_e_extrair_filtros, processar_unidades_bloqueadas_csv
 
+ALLOWED_EXTENSIONS_CSV = {'csv'} # Específico para esta ferramenta
+
+def allowed_file_csv(filename):
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS_CSV
 
 # --- Constantes ---
 TIPOLOGIAS_PADRAO = {
@@ -1829,6 +1834,147 @@ def confirmar_processar_preco_incorporacao():
                                active_page=active_page,
                                potential_valor_cols=potential_valor_cols,
                                session_key=session_key)
+    
+@app.route('/formatacao/unidades-bloqueadas', methods=['GET', 'POST'])
+def formatador_unidades_bloqueadas_tool():
+    tool_session_key = 'unid_bloq_csv_data'
+    active_page = 'formatador_unidades_bloqueadas'
+    
+    if request.method == 'POST':
+        if 'arquivo_entrada' not in request.files:
+            flash('Nenhum arquivo selecionado!', 'error')
+            return redirect(request.url)
+        
+        file = request.files['arquivo_entrada']
+        if file.filename == '':
+            flash('Nenhum arquivo selecionado!', 'error')
+            return redirect(request.url)
+
+        if file and allowed_file_csv(file.filename):
+            original_filename = file.filename
+            # Usar um nome de arquivo temporário mais exclusivo para evitar colisões se múltiplos usuários
+            # fizerem upload ao mesmo tempo, ou adicionar um UUID.
+            # Para simplicidade, manteremos o nome baseado no original e prefixo.
+            filename = secure_filename(f"temp_unid_bloq_{original_filename}")
+            temp_filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+            
+            try:
+                os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+                file.save(temp_filepath)
+                print(f"Arquivo CSV salvo temporariamente: {temp_filepath}")
+
+                # Lê o CSV e extrai opções de filtro
+                _, empreendimentos_unicos, motivos_unicos, _, _ = ler_csv_e_extrair_filtros(temp_filepath)
+                
+                session[tool_session_key] = {
+                    'temp_filepath': temp_filepath,
+                    'original_filename': original_filename,
+                    'empreendimentos_unicos': empreendimentos_unicos,
+                    'motivos_unicos': motivos_unicos
+                }
+                
+                return redirect(url_for('formatador_unidades_bloqueadas_tool_processar'))
+
+            except ValueError as ve:
+                flash(f"Erro ao ler o arquivo CSV: {ve}", 'error')
+            except Exception as e:
+                flash(f"Ocorreu um erro inesperado ao preparar os filtros: {e}", 'error')
+                traceback.print_exc()
+            finally:
+                # Não remove o temp_filepath aqui, pois será usado na próxima etapa
+                # A remoção será feita após o processamento final ou se o usuário abandonar
+                pass
+            
+            # Se chegou aqui, houve erro antes do redirect para processar
+            if os.path.exists(temp_filepath):
+                try: os.remove(temp_filepath)
+                except OSError: pass
+            session.pop(tool_session_key, None)
+            return redirect(request.url)
+
+        else:
+            flash('Tipo de arquivo inválido. Apenas .csv é permitido.', 'error')
+            return redirect(request.url)
+
+    # Método GET - Limpa sessão e mostra formulário de upload
+    session.pop(tool_session_key, None) # Limpa dados de processamento anterior
+    session.pop('unid_bloq_resultado_url', None) # Limpa URL de resultado anterior
+    return render_template('unidades_bloqueadas.html', active_page=active_page)
+
+
+# Rota para mostrar filtros e processar com base neles
+@app.route('/formatacao/unidades-bloqueadas/processar', methods=['GET', 'POST'])
+def formatador_unidades_bloqueadas_tool_processar():
+    tool_session_key = 'unid_bloq_csv_data'
+    active_page = 'formatador_unidades_bloqueadas' # Ou uma nova active_page para a etapa de filtro
+
+    session_data = session.get(tool_session_key)
+    if not session_data or 'temp_filepath' not in session_data:
+        flash('Sessão expirada ou arquivo não encontrado. Por favor, faça o upload novamente.', 'warning')
+        return redirect(url_for('formatador_unidades_bloqueadas_tool'))
+
+    temp_filepath = session_data['temp_filepath']
+    original_filename = session_data['original_filename']
+    empreendimentos_unicos = session_data.get('empreendimentos_unicos', [])
+    motivos_unicos = session_data.get('motivos_unicos', [])
+
+    if request.method == 'POST':
+        empreendimentos_a_ignorar = request.form.getlist('ignorar_empreendimento')
+        motivos_a_ignorar = request.form.getlist('ignorar_motivo')
+
+        try:
+            # Re-ler o DataFrame do arquivo salvo (ou passar o DataFrame na sessão se for pequeno)
+            # Para arquivos grandes, re-ler é mais seguro para a memória da sessão.
+            df_input_reloaded, _, _, col_emp_input, _ = ler_csv_e_extrair_filtros(temp_filepath)
+
+            output_excel_stream = processar_unidades_bloqueadas_csv(
+                df_input_reloaded,
+                col_emp_input, # Passar o nome da coluna de empreendimento lida
+                empreendimentos_a_ignorar,
+                motivos_a_ignorar
+            )
+            
+            output_filename = f"filtrado_unidades_bloqueadas_{os.path.splitext(original_filename)[0]}.xlsx"
+            
+            # Limpa a sessão principal ANTES de enviar o arquivo
+            session.pop(tool_session_key, None)
+            # Não precisa limpar resultado_url aqui, pois o send_file é direto
+
+            return send_file(
+                output_excel_stream,
+                as_attachment=True,
+                download_name=output_filename,
+                mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+            )
+
+        except ValueError as ve:
+            flash(f"Erro de validação ao processar: {ve}", 'error')
+        except RuntimeError as re: # Captura RuntimeError do processamento
+            flash(f"Erro de execução ao processar: {re}", 'error')
+        except Exception as e:
+            flash(f"Ocorreu um erro inesperado durante o processamento final: {e}", 'error')
+            traceback.print_exc()
+        finally:
+            # Limpeza do arquivo temporário de UPLOAD original
+            if os.path.exists(temp_filepath):
+                try:
+                    os.remove(temp_filepath)
+                    print(f"Arquivo CSV temporário removido: {temp_filepath}")
+                except OSError as e:
+                    print(f"Erro ao remover arquivo CSV temporário {temp_filepath}: {e}")
+            # Garante que a sessão seja limpa em caso de erro também
+            session.pop(tool_session_key, None)
+        
+        # Se erro, redireciona para a página de filtros para tentar novamente ou para o upload
+        return redirect(url_for('formatador_unidades_bloqueadas_tool_processar'))
+
+
+    # Método GET para a página de filtros
+    return render_template('unidades_bloqueadas_filtros.html',
+                           active_page=active_page,
+                           empreendimentos_unicos=empreendimentos_unicos,
+                           motivos_unicos=motivos_unicos,
+                           original_filename=original_filename) # Para mostrar ao usuário qual arquivo está sendo filtrado
 
 # --- Roda a aplicação ---
 if __name__ == "__main__":
