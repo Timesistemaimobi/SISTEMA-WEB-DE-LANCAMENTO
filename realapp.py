@@ -35,11 +35,13 @@ def allowed_file_csv(filename):
 
 # --- Constantes ---
 TIPOLOGIAS_PADRAO = {
-    "51 - 2 quartos sem suíte": "51", "36 - 2 quartos sendo 1 suíte térreo": "36",
+    "51 - 2 quartos sem suíte": "51", 
+    "36 - 2 quartos sendo 1 suíte térreo": "36",
     "34 - 3 quartos sendo 1 suíte térreo": "34",
     "21 - 2 quartos sendo 1 suíte casa": "21",
     "20 - 3 quartos sendo 1 suíte casa": "20",
-    "88 PCD - 2 quartos sendo 1 suíte casa (PCD)": "88" 
+    "22 - 2 quartos sem suíte casa": "22",
+    "88 PCD - 2 quartos sendo 1 suíte casa (PCD)": "88"
 }
 TIPOLOGIAS_SUPERIOR = {
     "52 - 2 quartos sem suíte": "52", "35 - 2 quartos sendo 1 suíte superior": "35",
@@ -47,7 +49,8 @@ TIPOLOGIAS_SUPERIOR = {
 }
 TIPOLOGIAS_PCD = {
     "50 PCD - 2 QUARTOS SENDO UMA SUÍTE - TÉRREO (PCD)": "50", 
-    "88 PCD - 2 quartos sendo 1 suíte casa (PCD)": "88" 
+    "88 PCD - 2 quartos sendo 1 suíte casa (PCD)": "88",
+    "19 PCD - 2 quartos sem suíte": "19"
 }
 ENDERECO_FIXO = {
     "Endereço": "Av. Olívia Flores", "Bairro": "Candeias", "Número": "1265", "Estado": "Bahia",
