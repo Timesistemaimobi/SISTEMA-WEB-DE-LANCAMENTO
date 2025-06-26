@@ -427,6 +427,30 @@ def formatar_unidade_sienge(row, bloco_coluna_nome, apt_coluna_nome, tipo_unidad
         import traceback
         traceback.print_exc()
         return "ERRO_FORMAT"
+    
+def parse_and_reformat_composite_unit(unit_string):
+    if pd.isna(unit_string) or not isinstance(unit_string, str):
+        return "N/D"
+
+    unit_string = unit_string.strip()
+    
+    # Regex para capturar as partes: (BL ou US)(dígitos) - ignora QD - (CS)(dígitos) (e opcionalmente PCD)
+    match = re.match(r'^(BL|US)(\d+)-QD\d+-(CS)(\d+)(\s*\(PCD\))?$', unit_string, re.IGNORECASE)
+    
+    if match:
+        prefixo_bloco = match.group(1).upper() # BL ou US
+        numero_bloco = match.group(2)
+        prefixo_casa = "CASA" # Fixo, pois 'CS' foi encontrado
+        numero_casa = match.group(4)
+        sufixo_pcd = match.group(5) or "" # Pega o sufixo PCD se existir, senão string vazia
+
+        # Remonta a string no formato desejado
+        # Ex: "BL01 - CASA 01 (PCD)" ou "US22 - CASA 01"
+        return f"{prefixo_bloco}{numero_bloco} - {prefixo_casa} {numero_casa}{sufixo_pcd.strip()}"
+    
+    # Se não der match, retorna a string original como fallback
+    print(f"Aviso: A unidade '{unit_string}' não correspondeu ao formato esperado 'BL/US...-QD...-CS...'. Usando valor original.")
+    return unit_string
 
 # --- Funções Auxiliares SIENGE Lote ---
 def normalize_column_name_sienge_lote(c):
@@ -783,94 +807,92 @@ def map_tipologias_cv_route():
     return render_template('map_tipologias_cv.html', active_page='importacao_cv', tipos_unicos=tipos, is_casa_project=is_casa,
                            tipologias_padrao=TIPOLOGIAS_PADRAO, tipologias_superior=TIPOLOGIAS_SUPERIOR, tipologias_pcd=TIPOLOGIAS_PCD)
 
+# Em realapp.py, substitua TODA a função process_file_cv
+
+# Em realapp.py, substitua TODA a função process_file_cv
+
 @app.route('/process-cv', methods=['POST'])
 def process_file_cv():
     tool_prefix = 'cv_'
     if f'{tool_prefix}uploaded_filename' not in session: flash('Sessão expirada CV.','error'); return redirect(url_for('importacao_cv_index'))
-    fname=session[f'{tool_prefix}uploaded_filename']; basic=session[f'{tool_prefix}basic_info']; is_casa=session.get(f'{tool_prefix}is_casa_project',False); tipos_orig=session.get(f'{tool_prefix}tipos_unicos',[])
+    fname=session[f'{tool_prefix}uploaded_filename']; basic=session[f'{tool_prefix}basic_info']; is_casa_session=session.get(f'{tool_prefix}is_casa_project',False); tipos_orig=session.get(f'{tool_prefix}tipos_unicos',[])
     fpath=os.path.join(app.config['UPLOAD_FOLDER'],fname)
     if not os.path.exists(fpath): flash('Arquivo temp sumiu.','error'); return redirect(url_for('importacao_cv_index'))
     try:
         tip_map={}
         for t in tipos_orig:
-            p,pc,s=request.form.get(f'tipo_{t}_padrao','').strip(), request.form.get(f'tipo_{t}_pcd','').strip(), request.form.get(f'tipo_{t}_superior','').strip() if not is_casa else None
+            p,pc,s=request.form.get(f'tipo_{t}_padrao','').strip(), request.form.get(f'tipo_{t}_pcd','').strip(), request.form.get(f'tipo_{t}_superior','').strip() if not is_casa_session else None
             cp,cpc,cs = TIPOLOGIAS_PADRAO.get(p,p or None), TIPOLOGIAS_PCD.get(pc,pc or None), TIPOLOGIAS_SUPERIOR.get(s,s or None) if s is not None else None
             tip_map[t]={'padrao':cp,'pcd':cpc,'superior':cs}
-        df=pd.read_excel(fpath,engine="openpyxl", dtype=str); # Ler como string inicialmente é mais seguro
+        df=pd.read_excel(fpath,engine="openpyxl", dtype=str)
         df.columns=df.columns.str.strip()
-        df = df.fillna('') # Preenche NaN com string vazia
-        print("Procurando colunas Bloco/Quadra e Casa/Apto...")
-        bloco_quadra_col_name = find_column_flexible(df.columns, ['bloco', 'quadra', 'blk', 'qd'], 'Bloco/Quadra', required=True)
-        casa_apto_col_name = find_column_flexible(df.columns, ['casa', 'apto', 'apt', 'apartamento', 'unidade'], 'Casa/Apto', required=True)
-        print(f"Coluna Bloco/Quadra encontrada: '{bloco_quadra_col_name}'")
-        print(f"Coluna Casa/Apto encontrada: '{casa_apto_col_name}'")
+        df = df.fillna('')
+
+        # ### INÍCIO DA CORREÇÃO DE ESCOPO CV ###
+        
+        print("Procurando por coluna 'UNIDADE' consolidada...")
+        composite_unit_col = find_column_flexible(df.columns, ['unidade'], 'Unidade Consolidada', required=False)
+        is_casa_project = False # Será definida dentro do if/else
+
+        if composite_unit_col:
+            print(f"Coluna 'UNIDADE' consolidada encontrada: '{composite_unit_col}'.")
+            df.rename(columns={composite_unit_col: "Nome (Unidade)"}, inplace=True)
+            if df["Nome (Unidade)"].str.contains("-CS", na=False, case=False).any():
+                print("Detectado projeto de CASAS pelo formato '-CS' na coluna UNIDADE.")
+                is_casa_project = True
+            else:
+                print("Formato '-CS' não encontrado, tratando como projeto de APARTAMENTOS.")
+                is_casa_project = False
+
+        else: # Caminho legado
+            print("Coluna 'UNIDADE' consolidada não encontrada. Buscando colunas separadas...")
+            bloco_quadra_col_name = find_column_flexible(df.columns, ['bloco', 'quadra', 'blk', 'qd'], 'Bloco/Quadra', required=True)
+            casa_apto_col_name = find_column_flexible(df.columns, ['casa', 'apto', 'apt', 'apartamento'], 'Casa/Apto', required=True)
+            
+            if 'casa' in normalize_text(casa_apto_col_name):
+                is_casa_project = True
+
+            df["Nome (Unidade)"] = df.apply(
+                lambda r: formatar_nome_unidade(r, bq_col_name=bloco_quadra_col_name, ca_col_name=casa_apto_col_name),
+                axis=1
+            )
+        # ### FIM DA CORREÇÃO DE ESCOPO CV ###
+
         n_cols={normalize_text(c):c for c in df.columns}; t_col=n_cols.get("TIPO")
         if t_col and t_col.upper()!='TIPO': df.rename(columns={t_col:"TIPO"},inplace=True)
         elif "TIPO" not in df.columns: raise ValueError("Coluna TIPO sumiu.")
+        
         g_col=encontrar_coluna_garagem(df.columns)
         if g_col: df.rename(columns={g_col:"GARAGEM_ORIG"},inplace=True); g_col="GARAGEM_ORIG"
+            
         col_map_ui={"Nome do Empreendimento":"Nome (Empreendimento)","Sigla":"Sigla (Empreendimento)","Empresa":"Empresa (Empreendimento)","Tipo":"Tipo (Empreendimento)","Segmento":"Segmento (Empreendimento)"}
         for k,v in col_map_ui.items(): df[v]=basic.get(k,'')
         col_map_fix={"Endereço":"Endereço (Empreendimento)","CEP":"CEP (Empreendimento)","Região":"Região (Empreendimento)","Bairro":"Bairro (Empreendimento)","Número":"Número (Empreendimento)","Estado":"Estado (Empreendimento)","Cidade":"Cidade (Empreendimento)","Data da Entrega (Empreendimento)":"Data da Entrega (Empreendimento)"}
         for k,v in ENDERECO_FIXO.items():
             if k in col_map_fix: df[col_map_fix[k]]=v
         df["Matrícula (Empreendimento)"]="XXXXX"; df["Ativo no painel (Empreendimento)"]="Ativo"; df["Nome (Etapa)"]="ETAPA 01"; df["Nome (Bloco)"]="BLOCO 01"; df["Ativo no painel (Unidade)"]="Ativo"
-        df["Nome (Unidade)"] = df.apply(
-            lambda r: formatar_nome_unidade(
-                r,
-                bq_col_name=bloco_quadra_col_name,
-                ca_col_name=casa_apto_col_name
-            ),
-            axis=1
-        )
-
-        g_col=encontrar_coluna_garagem(df.columns) # Função auxiliar existente
-        original_garage_col_name = None # Para log
-        if g_col:
-            original_garage_col_name = g_col
-            df.rename(columns={g_col:"GARAGEM_ORIG"},inplace=True)
-            g_col="GARAGEM_ORIG" # Usa o nome renomeado internamente
-            print(f"Coluna de Garagem encontrada como '{original_garage_col_name}' e renomeada para '{g_col}'")
-        else:
-            print("Aviso: Coluna de Garagem não encontrada.")
-            g_col = None # Garante que g_col seja None se não for encontrada
-            
+        
         v_num_mode=basic.get('vaga_por_numero')=='on'
         df["Vagas de garagem (Unidade)"]=df[g_col].apply(lambda x: verificar_vaga(x, v_num_mode)) if g_col else "01 VAGA"
-        if g_col: # Verifica se a coluna de garagem foi encontrada e renomeada
-            # Aplica a formatação usando a coluna renomeada (GARAGEM_ORIG)
-            df["Área de Garagem (Unidade)"] = df[g_col].apply(lambda x: format_decimal_br_cv(x, precision=2))
-            print(f"Coluna 'Área de Garagem (Unidade)' criada e formatada a partir de '{original_garage_col_name}'.")
-        else:
-            # Se nenhuma coluna de garagem foi encontrada, cria a coluna vazia
-            df["Área de Garagem (Unidade)"] = ""
+        df["Área de Garagem (Unidade)"] = df[g_col].apply(lambda x: format_decimal_br_cv(x, precision=2)) if g_col else ""
+        
         quintal_col_name = find_column_flexible(df.columns, ['quintal', 'jardim'], 'Quintal/Jardim', required=False)
         df["Jardim (Unidade)"]=df[quintal_col_name].apply(formatar_jardim) if quintal_col_name else ""
-        area_const_col_name = find_column_flexible(df.columns, ['areaconstruida', 'área construída'], 'Área Construída/Privativa', required=False)
-        new_area_col_name = "Área privativa m² (Unidade)"
-        if area_const_col_name:
-            # Aplica a função de formatação com 2 casas decimais
-            df[new_area_col_name] = df[area_const_col_name].apply(lambda x: format_decimal_br_cv(x, precision=2))
-            print(f"Coluna 'Área privativa (Unidade)' criada e formatada a partir de '{area_const_col_name}'.")
-        else:
-            df[new_area_col_name] = "" # Define como vazio se a coluna não for encontrada
-            print("Aviso: Coluna de Área Construída/Privativa não encontrada.")
-
+        
+        area_const_col_name = find_column_flexible(df.columns, ['areaconstruida', 'área construída', 'area privativa'], 'Área Construída/Privativa', required=False)
+        df["Área privativa m² (Unidade)"] = df[area_const_col_name].apply(lambda x: format_decimal_br_cv(x, precision=2)) if area_const_col_name else ""
+        
         fracao_col_name = find_column_flexible(df.columns, ['fracaoideal', 'fração ideal'], 'Fração Ideal', required=False)
-        # Agora o IF pode usar a variável fracao_col_name
-        if fracao_col_name:
-             # Aplica a função de formatação com 9 casas decimais (ou quantas precisar)
-            df["Fração Ideal (Unidade)"] = df[fracao_col_name].apply(lambda x: format_decimal_br_cv(x, precision=9))
-            print(f"Coluna 'Fração Ideal (Unidade)' criada e formatada a partir de '{fracao_col_name}'.")
-        else:
-            df["Fração Ideal (Unidade)"] = "" # Define como vazio se não encontrar
-            print("Aviso: Coluna de Fração Ideal não encontrada.")
-
-        df["Tipo (Unidade)"]=df["TIPO"].astype(str).fillna(''); df["Tipologia (Unidade)"]=df.apply(lambda r: mapear_tipologia_web(r, tip_map, is_casa), axis=1)
+        df["Fração Ideal (Unidade)"] = df[fracao_col_name].apply(lambda x: format_decimal_br_cv(x, precision=9)) if fracao_col_name else ""
+        
+        df["Tipo (Unidade)"]=df["TIPO"].astype(str).fillna('')
+        df["Tipologia (Unidade)"]=df.apply(lambda r: mapear_tipologia_web(r, tip_map, is_casa_project), axis=1)
+        
         cols_out=["Nome (Empreendimento)","Sigla (Empreendimento)","Matrícula (Empreendimento)","Empresa (Empreendimento)","Tipo (Empreendimento)","Segmento (Empreendimento)","Ativo no painel (Empreendimento)","Região (Empreendimento)","CEP (Empreendimento)","Endereço (Empreendimento)","Bairro (Empreendimento)","Número (Empreendimento)","Estado (Empreendimento)","Cidade (Empreendimento)","Data da Entrega (Empreendimento)","Nome (Etapa)","Nome (Bloco)","Nome (Unidade)","Tipologia (Unidade)","Tipo (Unidade)","Área privativa m² (Unidade)","Jardim (Unidade)","Área de Garagem (Unidade)","Vagas de garagem (Unidade)","Fração Ideal (Unidade)","Ativo no painel (Unidade)"]
         df_final=df[[c for c in cols_out if c in df.columns]]
         output=io.StringIO(); df_final.to_csv(output,index=False,encoding='utf-8-sig',sep=';',quoting=csv.QUOTE_MINIMAL,decimal=',')
         output.seek(0)
+        
         if os.path.exists(fpath): os.remove(fpath)
         session.pop(f'{tool_prefix}uploaded_filename',None); session.pop(f'{tool_prefix}basic_info',None); session.pop(f'{tool_prefix}tipos_unicos',None); session.pop(f'{tool_prefix}is_casa_project',None)
         out_fname=f"importacao_cv_{basic.get('Sigla','output')}.csv"
@@ -990,22 +1012,51 @@ def process_file_sienge():
         if not any_map and etapas_orig: print(" Nenhum mapeamento.")
         print("-"*30)
         df=pd.read_excel(fpath,engine="openpyxl"); df.columns=df.columns.str.upper().str.strip()
-        bloco_col="QUADRA" if "QUADRA" in df.columns else "BLOCO" if "BLOCO" in df.columns else None
-        apt_col="CASA" if "CASA" in df.columns else "APT" if "APT" in df.columns else None
-        cols_ess=["ETAPA","ÁREA CONSTRUIDA","FRAÇÃO IDEAL"]
-        if not bloco_col and not apt_col: raise ValueError("Faltando cols ID (QUADRA/BLOCO ou CASA/APT)")
-        if bloco_col: cols_ess.append(bloco_col);
-        if apt_col: cols_ess.append(apt_col)
-        missing=[c for c in cols_ess if c not in df.columns];
-        if missing: raise ValueError(f"Colunas SIENGE faltando: {', '.join(missing)}")
+
+        # ### INÍCIO DA CORREÇÃO LÓGICA SIENGE ###
+        df_out=pd.DataFrame()
+        
+        # Mapeamento de Etapa (comum a ambos os caminhos)
         def map_et_int(row): et_s=str(row.get('ETAPA','')); et_n=''.join(filter(str.isdigit,et_s)); return etapas_map.get(et_n,None)
-        df["EMPREENDIMENTO_CODIGO"]=df.apply(map_et_int,axis=1)
-        df_out=pd.DataFrame(); df_out['EMPREENDIMENTO']=df['EMPREENDIMENTO_CODIGO']
-        df_out['UNIDADE']=df.apply(lambda r: formatar_unidade_sienge(r,bloco_col,apt_col),axis=1)
+        df_out['EMPREENDIMENTO']=df.apply(map_et_int,axis=1)
+
+        print("Procurando por coluna 'UNIDADE' consolidada...")
+        composite_unit_col = find_column_flexible(df.columns, ['UNIDADE'], 'Unidade Consolidada', required=False)
+        
+        if composite_unit_col:
+            # CAMINHO 1: Novo formato encontrado!
+            print(f"Coluna 'UNIDADE' consolidada encontrada: '{composite_unit_col}'. Copiando valores diretamente.")
+            
+            # Apenas copia o valor da coluna 'UNIDADE' exatamente como está.
+            df_out['UNIDADE'] = df[composite_unit_col]
+            
+            # Determina o tipo de imóvel baseado no conteúdo da string
+            df_out['TIPO DE IMÓVEL'] = df[composite_unit_col].apply(lambda x: "CASA" if "-CS" in str(x).upper() else "APARTAMENTO")
+
+        else:
+            # CAMINHO 2: Fallback para o formato legado
+            print("Coluna 'UNIDADE' consolidada não encontrada. Buscando colunas separadas (legado)...")
+            bloco_col="QUADRA" if "QUADRA" in df.columns else "BLOCO" if "BLOCO" in df.columns else None
+            apt_col="CASA" if "CASA" in df.columns else "APT" if "APT" in df.columns else None
+            
+            if not bloco_col or not apt_col:
+                raise ValueError("Formato legado: Faltando colunas de identificação (QUADRA/BLOCO e CASA/APT)")
+
+            print(f"Colunas separadas encontradas: Bloco/Quadra='{bloco_col}', Casa/Apto='{apt_col}'")
+            
+            # Usa a função de formatação antiga para criar 'BL01 - CASA 01'
+            # A lógica de PCD está dentro de formatar_unidade_sienge
+            df_out['UNIDADE']=df.apply(lambda r: formatar_unidade_sienge(r, bloco_col, apt_col, r.get('TIPO')),axis=1)
+            df_out['TIPO DE IMÓVEL']=df.apply(lambda r: determinar_tipo_imovel_sienge(r,apt_col),axis=1)
+        
+        # O resto do processamento é comum a ambos os caminhos
         df_out['ÁREA PRIVATIVA']=pd.to_numeric(df['ÁREA CONSTRUIDA'],errors='coerce').fillna(0)
-        df_out['ÁREA COMUM']=0; df_out['FRAÇÃO IDEAL']=pd.to_numeric(df['FRAÇÃO IDEAL'],errors='coerce').fillna(0)
-        df_out['TIPO DE IMÓVEL']=df.apply(lambda r: determinar_tipo_imovel_sienge(r,apt_col),axis=1)
+        df_out['ÁREA COMUM']=0
+        df_out['FRAÇÃO IDEAL']=pd.to_numeric(df['FRAÇÃO IDEAL'],errors='coerce').fillna(0)
         df_out['ESTOQUE COMERCIAL']='D'; df_out['ESTOQUE LEGAL']='L'; df_out['ESTOQUE DE OBRA']='C'
+        # ### FIM DA CORREÇÃO LÓGICA SIENGE ###
+
+        # Geração do arquivo XLS (permanece a mesma)
         output=io.BytesIO(); wb=xlwt.Workbook(encoding='utf-8'); sheet=wb.add_sheet("Dados")
         for c,h in enumerate(df_out.columns): sheet.write(0,c,h)
         for r, row_data in enumerate(df_out.itertuples(index=False),start=1):
