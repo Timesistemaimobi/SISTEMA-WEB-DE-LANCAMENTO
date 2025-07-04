@@ -27,6 +27,7 @@ from formatadores.tabela_preco_importador import (
 )
 from formatadores.incorporacao_formatador import processar_incorporacao_web
 from formatadores.tabela_unidades_bloqueadas import ler_csv_e_extrair_filtros, processar_unidades_bloqueadas_csv
+from formatadores.tabela_desformatador import desformatar_tabela_precos
 
 ALLOWED_EXTENSIONS_CSV = {'csv'} # Específico para esta ferramenta
 
@@ -2070,6 +2071,60 @@ def formatador_unidades_bloqueadas_tool_processar():
                            empreendimentos_unicos=empreendimentos_unicos,
                            motivos_unicos=motivos_unicos,
                            original_filename=original_filename)
+
+@app.route('/desformatar-tabela-precos', methods=['POST'])
+def desformatador_tabela_precos_tool():
+    # Apenas POST é necessário para esta ferramenta simples
+    if 'arquivo_formatado' not in request.files:
+        flash('Nenhum arquivo selecionado para desformatar!', 'error')
+        return redirect(url_for('formatador_tabela_precos_upload')) # Volta para a página anterior
+
+    file = request.files['arquivo_formatado']
+
+    if file.filename == '':
+        flash('Nenhum arquivo selecionado!', 'error')
+        return redirect(url_for('formatador_tabela_precos_upload'))
+
+    if not file.filename.lower().endswith('.xlsx'):
+        flash('Arquivo inválido. Apenas planilhas .xlsx formatadas são aceitas.', 'error')
+        return redirect(url_for('formatador_tabela_precos_upload'))
+
+    try:
+        # Passa o objeto de arquivo diretamente para a função de processamento
+        file_stream = io.BytesIO(file.read())
+        print(f"(Desformatador Rota) Lendo o arquivo '{file.filename}' em memória.")
+
+        # A função retorna um DataFrame do pandas
+        df_limpo = desformatar_tabela_precos(file_stream)
+
+        # Prepara a saída como CSV
+        output_csv = io.StringIO()
+        df_limpo.to_csv(output_csv, sep=';', encoding='utf-8-sig', index=False, quoting=csv.QUOTE_MINIMAL)
+        output_csv.seek(0)
+
+        # Define nome do arquivo de saída
+        input_basename = file.filename.rsplit('.', 1)[0]
+        output_filename = f"{input_basename}_DADOS_EXTRAIDOS.csv"
+        print(f"(Desformatador Rota) Enviando arquivo: {output_filename}")
+
+        # Envia o arquivo CSV para download
+        return send_file(
+            io.BytesIO(output_csv.getvalue().encode('utf-8-sig')),
+            mimetype='text/csv',
+            as_attachment=True,
+            download_name=output_filename
+        )
+
+    except (ValueError, RuntimeError) as ve:
+        flash(f"Erro ao desformatar: {ve}", 'error')
+        print(f"(Desformatador Rota) Erro de processamento: {ve}")
+        return redirect(url_for('formatador_tabela_precos_upload'))
+    except Exception as e:
+        flash(f"Ocorreu um erro inesperado: {e}", 'error')
+        print(f"(Desformatador Rota) Erro inesperado: {e}")
+        traceback.print_exc()
+        return redirect(url_for('formatador_tabela_precos_upload'))
+
 
 # --- Para rodar o app (exemplo) ---
 if __name__ == '__main__':

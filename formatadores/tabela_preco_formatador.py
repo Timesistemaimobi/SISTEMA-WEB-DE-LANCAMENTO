@@ -163,6 +163,38 @@ def format_area_m2(numeric_value):
         print(f"AVISO: Erro ao formatar valor de área {numeric_value}. Retornando '--'.")
         return "--"
 
+# <<< INÍCIO DA MODIFICAÇÃO: Nova função auxiliar para o formato composto >>>
+def format_composite_unit_name(row):
+    """Gera o nome da unidade no formato BL/US-QD-CS, lendo direto do DataFrame intermediário."""
+    try:
+        # Lê os valores das colunas usando os nomes dos CONCEITOS
+        quadra_val = str(row.get('QUADRA_COMPOSITE', ''))
+        bloco_val = str(row.get('BLOCO_COMPOSITE', ''))
+        casa_val = str(row.get('CASA_COMPOSITE', ''))
+
+        quadra_num = extract_block_number_safe(quadra_val)
+        bloco_num = extract_block_number_safe(bloco_val)
+        casa_num = extract_block_number_safe(casa_val)
+
+        quadra_str = f"QD{quadra_num:02d}" if quadra_num is not None else "QD??"
+        casa_str = f"CS{casa_num:02d}" if casa_num is not None else "CS??"
+        
+        prefixo_str = ""
+        # Verifica se o valor da coluna Bloco é exatamente 'US' (ignorando case e espaços)
+        if bloco_val.strip().upper() == 'US':
+            # Se for 'US', o número vem da casa
+            prefixo_str = f"US{casa_num:02d}" if casa_num is not None else "US??"
+        else:
+            # Para qualquer outro valor (número do bloco), usa 'BL'
+            prefixo_str = f"BL{bloco_num:02d}" if bloco_num is not None else "BL??"
+        
+        return f"{prefixo_str}-{quadra_str}-{casa_str}"
+
+    except Exception as e:
+        print(f"AVISO: Erro ao gerar nome de unidade composto: {e}")
+        return "ERRO_UNIDADE"
+
+
 # --- Função Principal de Processamento (REVISADA) ---
 
 def processar_tabela_precos_web(input_filepath, block_etapa_mapping):
@@ -211,6 +243,24 @@ def processar_tabela_precos_web(input_filepath, block_etapa_mapping):
                         raise ValueError(f"Não foi possível ler o arquivo '{input_filepath}' como Excel (headers linha 1 ou 3) ou CSV (padrões testados). Verifique o formato. Erro final CSV: {e_csv_2}")
 
         print(f"  Arquivo lido com sucesso como: {file_type_used}")
+
+        # As colunas que são tipicamente mescladas (bloco, quadra) precisam ser preenchidas para baixo.
+        # Primeiro, identificamos os nomes originais dessas colunas no DataFrame.
+        cols_to_ffill = []
+        # Usamos `find_column_flexible` para encontrar os nomes reais das colunas de bloco e quadra.
+        bloco_col_ffill = find_column_flexible(df_input.columns, ['bloco'], 'Bloco for ffill', required=False)
+        quadra_col_ffill = find_column_flexible(df_input.columns, ['quadra'], 'Quadra for ffill', required=False)
+        
+        if bloco_col_ffill: cols_to_ffill.append(bloco_col_ffill)
+        if quadra_col_ffill: cols_to_ffill.append(quadra_col_ffill)
+
+        if cols_to_ffill:
+            print(f"  Aplicando forward-fill (preenchimento de células mescladas) para as colunas: {cols_to_ffill}")
+            # Substituímos strings vazias por NaN para que ffill funcione em ambos os casos.
+            df_input[cols_to_ffill] = df_input[cols_to_ffill].replace('', np.nan)
+            # Aplicamos o preenchimento progressivo.
+            df_input[cols_to_ffill] = df_input[cols_to_ffill].ffill()
+            
         df_input = df_input.fillna('') # Garante que não há NaNs literais, substituindo por string vazia
         df_input.columns = df_input.columns.str.strip() # Limpa nomes das colunas
 
@@ -219,25 +269,70 @@ def processar_tabela_precos_web(input_filepath, block_etapa_mapping):
         if df_input.empty:
             raise ValueError("O arquivo parece estar vazio ou não contém dados após a leitura.")
 
-        print(f"  Dimensões do DataFrame lido: {df_input.shape}")
-
-        # 2. Definir Conceitos Padrão e Encontrar Colunas Correspondentes
-        col_concepts = {
-            'BLOCO': (['bloco', 'blk', 'quadra'], True),
-            'UNIDADE': (['apt', 'apto', 'apartamento', 'unidade', 'casa', 'unid', 'ap', 'lote'], True),
-            'TIPOLOGIA': (['tipologia', 'tipo', 'descricao', 'descrição'], False),
-            'AREA_CONSTRUIDA': (['area construida', 'área construída', 'areaconstruida', 'area util', 'área útil', 'area privativa', 'área privativa', 'área'], True), # Área principal é obrigatória
-            'QUINTAL': (['quintal', 'jardim', 'area descoberta', 'área descoberta', 'area externa', 'área externa', 'quintal m2', 'jardim m2'], False),
-            'GARAGEM': (['garagem', 'vaga', 'vagas', 'estacionamento'], False),
-            'VALOR': (['valor', 'preco', 'preço', 'valor imovel', 'valor do imóvel', 'valor venda', 'valor do imovel (1x)', 'valor do imovel 1x', 'valor a vista', 'valorávista'], False) # Valor passa a ser opcional para flexibilidade
+        print("--- Mapeamento de Colunas (Etapa 1: Detecção de Modo) ---")
+        found_columns_map = {}
+        
+        # 2.1. ETAPA 1: Tenta encontrar as colunas do modo composto primeiro.
+        composite_concepts_to_check = {
+            'QUADRA_COMPOSITE': ['quadra'],
+            'BLOCO_COMPOSITE': ['bloco'],
+            'CASA_COMPOSITE': ['casa'],
         }
-        found_columns_map = {} # Mapeia CONCEITO -> NOME_ORIGINAL_ENCONTRADO
-        print("--- Buscando Colunas Padrão ---")
-        for concept, (keywords, is_required) in col_concepts.items():
-             # *** CORRIGIDO: Passa df_input.columns ***
-             found_name = find_column_flexible(df_input.columns, keywords, concept, required=is_required)
-             if found_name:
+        for concept, keywords in composite_concepts_to_check.items():
+            found_name = find_column_flexible(df_input.columns, keywords, concept, required=False)
+            if found_name:
                 found_columns_map[concept] = found_name
+
+        # Decide se o modo composto está ativo
+        is_composite_unit_mode = all(k in found_columns_map for k in composite_concepts_to_check.keys())
+        if is_composite_unit_mode:
+            print(">>> DETECTADO: Modo de Unidade Composta (QUADRA, BLOCO, CASA) ativado.")
+            # A coluna de agrupamento principal será a de Bloco do modo composto
+            found_columns_map['BLOCO'] = found_columns_map['BLOCO_COMPOSITE']
+        
+        print("--- Mapeamento de Colunas (Etapa 2: Mapeamento Padrão) ---")
+        # 2.2. ETAPA 2: Mapeia as colunas padrão, ajustando as keywords e requisitos com base no modo detectado.
+        
+        # Define os conceitos padrão
+        standard_concepts = {
+            'BLOCO': (['bloco', 'blk'], True),
+            'UNIDADE': (['apt', 'apto', 'apartamento', 'unidade', 'unid', 'ap'], True), # Keywords base
+            'TIPOLOGIA': (['tipologia', 'tipo', 'descricao', 'descrição'], False),
+            'AREA_CONSTRUIDA': (['area construida', 'área construída', 'areaconstruida', 'area util', 'área útil', 'area privativa', 'área privativa', 'área'], True),
+            'QUINTAL': (['quintal', 'jardim'], False),
+            'GARAGEM': (['garagem', 'vaga'], False),
+            'VALOR': (['valor', 'preco', 'preço'], False)
+        }
+
+        # Condicionalmente adiciona 'casa' e 'lote' às keywords de UNIDADE
+        if not is_composite_unit_mode:
+            print("   -> Modo padrão. 'casa' e 'lote' são keywords válidas para UNIDADE.")
+            standard_concepts['UNIDADE'][0].extend(['casa', 'lote'])
+
+        # Loop para mapear os conceitos padrão
+        for concept, (keywords, is_required) in standard_concepts.items():
+            # Pula o mapeamento de conceitos que já foram definidos pelo modo composto (ex: BLOCO)
+            if concept in found_columns_map:
+                continue
+
+            # Ajusta a obrigatoriedade da coluna UNIDADE
+            final_requirement = is_required
+            if concept == 'UNIDADE' and is_composite_unit_mode:
+                final_requirement = False # No modo composto, a coluna UNIDADE padrão não é obrigatória
+
+            found_name = find_column_flexible(df_input.columns, keywords, concept, required=final_requirement)
+            if found_name:
+                found_columns_map[concept] = found_name
+        
+        # Validação final de colunas obrigatórias
+        if is_composite_unit_mode:
+            # Já validado pela detecção
+            pass
+        elif 'UNIDADE' not in found_columns_map:
+             raise ValueError("Coluna 'UNIDADE' (ou apt, casa, lote, etc.) é obrigatória e não foi encontrada.")
+        if 'BLOCO' not in found_columns_map:
+             raise ValueError("Coluna 'BLOCO' (ou quadra) é obrigatória e não foi encontrada.")
+
         print("--- Mapeamento de Colunas Padrão Encontradas ---")
         print(found_columns_map)
         print("-" * 30)
@@ -245,7 +340,7 @@ def processar_tabela_precos_web(input_filepath, block_etapa_mapping):
         # --- Identificar Colunas Extras (não mapeadas como padrão) ---
         mapped_original_names = set(found_columns_map.values())
         extra_col_names = [
-            col for col in df_input.columns if col not in mapped_original_names and col # Garante que não adiciona colunas com nome vazio
+            col for col in df_input.columns if col not in mapped_original_names and col
         ]
         if extra_col_names:
             print(f"--- Colunas Extras Identificadas ---")
@@ -255,205 +350,201 @@ def processar_tabela_precos_web(input_filepath, block_etapa_mapping):
         # --- Detecção de Lote (Baseado na coluna UNIDADE encontrada) ---
         col_unidade_nome = found_columns_map.get('UNIDADE')
         is_lote_file = False
-        if col_unidade_nome and col_unidade_nome in df_input.columns:
-            # Verifica se *alguma* célula na coluna UNIDADE contém 'lote', ignorando case e NaN/vazios
+        # <<< INÍCIO DA MODIFICAÇÃO: A detecção de lote só ocorre se não estivermos no modo composto >>>
+        if not is_composite_unit_mode and col_unidade_nome and col_unidade_nome in df_input.columns:
             if df_input[col_unidade_nome].astype(str).str.contains('lote', case=False, na=False).any():
                 is_lote_file = True
                 print(">>> DETECTADO: Arquivo parece ser de LOTEAMENTO (encontrado 'lote' na coluna Unidade). Saída será adaptada.")
-        else:
-            print("AVISO: Coluna 'UNIDADE' não encontrada ou não mapeada corretamente. Não é possível detectar modo Lote automaticamente.")
+        elif not is_composite_unit_mode:
+             print("AVISO: Coluna 'UNIDADE' não encontrada ou não mapeada corretamente. Não é possível detectar modo Lote automaticamente.")
+        # <<< FIM DA MODIFICAÇÃO >>>
+
 
         # 3. Preparar DataFrame Intermediário (Incluindo Dados Extras)
         df_intermediate = pd.DataFrame()
-        # Copia dados das colunas padrão encontradas, usando o CONCEITO como chave
         for concept, original_col_name in found_columns_map.items():
              df_intermediate[concept] = df_input[original_col_name].astype(str).copy()
-        # Copia dados das colunas extras, usando o NOME ORIGINAL como chave
         for extra_col_name in extra_col_names:
             df_intermediate[extra_col_name] = df_input[extra_col_name].astype(str).copy()
 
-        # Adiciona colunas auxiliares (Bloco Original, Etapa Mapeada)
         col_bloco_orig_found = found_columns_map.get('BLOCO')
         if not col_bloco_orig_found: raise ValueError("Coluna Bloco/Quadra obrigatória não foi encontrada.")
 
-        # Garante que a coluna de bloco original existe antes de usá-la
         if col_bloco_orig_found not in df_input.columns:
              raise ValueError(f"Erro interno: Coluna de bloco '{col_bloco_orig_found}' mapeada mas não encontrada no DataFrame de entrada.")
 
         df_intermediate['BLOCO_ORIGINAL'] = df_input[col_bloco_orig_found].astype(str)
-        # Propaga valores de bloco para baixo (ffill) para tratar células mescladas ou vazias
-        # Antes de ffill, substitui strings vazias por NaN para que ffill funcione corretamente
         df_intermediate['BLOCO_ORIGINAL'] = df_intermediate['BLOCO_ORIGINAL'].replace('', np.nan).ffill()
-        # Remove linhas que possam ter ficado sem bloco após o ffill (ex: linhas antes do primeiro bloco válido)
         df_intermediate.dropna(subset=['BLOCO_ORIGINAL'], inplace=True)
 
-        # Garante que a coluna UNIDADE exista no df_intermediate para a próxima etapa
-        if 'UNIDADE' not in df_intermediate.columns:
-             raise ValueError("Coluna 'UNIDADE' é obrigatória e não foi encontrada ou mapeada.")
-        # Remove linhas onde a unidade é vazia, pois são provavelmente inválidas ou separadores
-        df_intermediate = df_intermediate[df_intermediate['UNIDADE'].astype(str).str.strip() != '']
+        # <<< INÍCIO DA MODIFICAÇÃO: A validação de UNIDADE muda >>>
+        # Se não for modo composto, a unidade é obrigatória. Se for, a casa é obrigatória.
+        if is_composite_unit_mode:
+            if 'CASA_COMPOSITE' not in df_intermediate.columns:
+                raise ValueError("Modo Composto ativo, mas coluna 'CASA_COMPOSITE' não foi encontrada no df_intermediate.")
+            df_intermediate = df_intermediate[df_intermediate['CASA_COMPOSITE'].astype(str).str.strip() != '']
+        else:
+            if 'UNIDADE' not in df_intermediate.columns:
+                 raise ValueError("Coluna 'UNIDADE' é obrigatória e não foi encontrada ou mapeada.")
+            df_intermediate = df_intermediate[df_intermediate['UNIDADE'].astype(str).str.strip() != '']
+        
         if df_intermediate.empty:
-            raise ValueError("Não foram encontrados dados válidos (com Bloco e Unidade preenchidos) no arquivo.")
+            raise ValueError("Não foram encontrados dados válidos (com Bloco e Unidade/Casa preenchidos) no arquivo.")
+        # <<< FIM DA MODIFICAÇÃO >>>
 
-        # Mapeia a etapa usando o dicionário fornecido
         def map_etapa(bloco_original):
-            bloco_str = str(bloco_original).strip() # Limpa espaços antes de buscar
+            bloco_str = str(bloco_original).strip()
             if not bloco_str or bloco_str.lower() == 'nan': return "ETAPA_NAO_MAPEADA"
             return block_etapa_mapping.get(bloco_str, "ETAPA_NAO_MAPEADA")
 
         df_intermediate['ETAPA_MAPEADA'] = df_intermediate['BLOCO_ORIGINAL'].apply(map_etapa)
-
-        # Alerta sobre blocos não mapeados
         unmapped_blocks = df_intermediate[df_intermediate['ETAPA_MAPEADA'] == "ETAPA_NAO_MAPEADA"]['BLOCO_ORIGINAL'].unique()
         if len(unmapped_blocks) > 0:
-            print(f"AVISO: Os seguintes Blocos/Quadras não foram encontrados no mapeamento de etapas e serão agrupados em 'ETAPA_NAO_MAPEADA': {list(unmapped_blocks)}")
+            print(f"AVISO: Os seguintes Blocos/Quadras não foram encontrados no mapeamento de etapas: {list(unmapped_blocks)}")
 
-        # 4. Agrupar e Ordenar Blocos por Etapa (para estrutura da planilha)
+        # 4. Agrupar e Ordenar Blocos por Etapa
         etapas_agrupadas = defaultdict(list)
-        # Usa drop_duplicates para pegar combinações únicas de Bloco/Etapa válidas
         valid_blocks = df_intermediate[['BLOCO_ORIGINAL', 'ETAPA_MAPEADA']].dropna().drop_duplicates()
         for _, row in valid_blocks.iterrows():
             etapa, bloco = row['ETAPA_MAPEADA'], row['BLOCO_ORIGINAL']
-            # Adiciona apenas se o bloco não for vazio ou 'nan' (já filtrado antes, mas reforça)
             if pd.notna(bloco) and str(bloco).strip().lower() != 'nan' and str(bloco).strip() != '':
-                 etapas_agrupadas[etapa].append(str(bloco).strip()) # Garante que é string e sem espaços extras
+                 etapas_agrupadas[etapa].append(str(bloco).strip())
             else:
                  print(f"Aviso: Bloco inválido ('{bloco}') encontrado para etapa '{etapa}', ignorando agrupamento.")
 
-        # Ordena as etapas (numericamente se possível, senão alfabeticamente)
         etapas_ordenadas = sorted(etapas_agrupadas.keys(), key=lambda e: (extract_stage_number(e), e))
-        # Ordena os blocos dentro de cada etapa (numericamente se possível)
         blocos_ordenados_por_etapa = {}
         for etapa in etapas_ordenadas:
-            blocos_da_etapa = list(set(etapas_agrupadas[etapa])) # Remove duplicatas se houver
+            blocos_da_etapa = list(set(etapas_agrupadas[etapa]))
             blocos_ordenados_por_etapa[etapa] = sorted(
                 blocos_da_etapa,
-                key=lambda b: (extract_block_number_safe(b) if extract_block_number_safe(b) is not None else float('inf'), b) # Desempate alfabético
+                key=lambda b: (extract_block_number_safe(b) if extract_block_number_safe(b) is not None else float('inf'), b)
             )
 
-        # 5. Construir Estrutura de Dados para Saída Excel (Dinâmica)
-        print(f"--- Montando Saída (Modo Lote: {is_lote_file}, Extras: {bool(extra_col_names)}) ---")
-        # Define a lista base de conceitos para a saída
+        # 5. Construir Estrutura de Dados para Saída Excel
+        print(f"--- Montando Saída (Modo Lote: {is_lote_file}, Modo Composto: {is_composite_unit_mode}, Extras: {bool(extra_col_names)}) ---")
+        
         if is_lote_file:
-            # Ordem e colunas para Lotes (sem Quintal/Garagem, mesmo que existam no input)
             output_concepts_base = ['UNIDADE', 'TIPOLOGIA', 'AREA_CONSTRUIDA']
-            # Adiciona VALOR se foi encontrado
-            if 'VALOR' in found_columns_map:
-                 output_concepts_base.append('VALOR')
+            if 'VALOR' in found_columns_map: output_concepts_base.append('VALOR')
         else:
-            # Ordem Padrão (inclui opcionais se foram encontrados no passo 2)
+            # <<< INÍCIO DA MODIFICAÇÃO: A coluna 'UNIDADE' é sempre a primeira, seja ela composta ou simples >>>
             standard_concepts_order = ['UNIDADE', 'TIPOLOGIA', 'AREA_CONSTRUIDA', 'QUINTAL', 'GARAGEM', 'VALOR']
-            # Filtra para incluir apenas os conceitos que TEM uma coluna mapeada em found_columns_map
-            output_concepts_base = [c for c in standard_concepts_order if c in found_columns_map]
+            # Se em modo composto, garantimos que 'UNIDADE' estará na saída.
+            # As colunas de composição não precisam estar na lista, pois não serão exibidas individualmente.
+            output_concepts_base = []
+            
+            # Adiciona 'UNIDADE' primeiro. No modo composto, ela será gerada dinamicamente.
+            output_concepts_base.append('UNIDADE')
 
-        # Lista final de identificadores (conceitos OU nomes extras) na ordem correta para a saída
+            # Adiciona os outros conceitos se foram encontrados
+            for c in standard_concepts_order:
+                if c != 'UNIDADE' and c in found_columns_map:
+                    output_concepts_base.append(c)
+            # <<< FIM DA MODIFICAÇÃO >>>
+
         final_output_identifiers = output_concepts_base + extra_col_names
 
-        # Mapeia identificadores para os nomes dos cabeçalhos na planilha Excel
-        header_map = { # Nomes "bonitos" para conceitos padrão
-            'UNIDADE': 'UNIDADE', 'TIPOLOGIA': 'TIPOLOGIA', 'AREA_CONSTRUIDA': 'ÁREA CONSTRUIDA',
+        header_map = {
+            'UNIDADE': 'UNIDADE', 'TIPOLOGIA': 'TIPOLOGIA', 'AREA_CONSTRUIDA': 'ÁREA CONSTRUÍDA', # Corrigido para acento
             'QUINTAL': 'QUINTAL', 'GARAGEM': 'GARAGEM', 'VALOR': 'VALOR DO IMÓVEL'
         }
-        # Para extras, o header é o próprio nome original; Para padrão, usa o mapa ou o identificador
         output_headers = [header_map.get(identifier, identifier) for identifier in final_output_identifiers]
-
+        
         print(f"   Colunas Finais de Saída: {output_headers}")
-        num_cols = len(output_headers) # Número total de colunas na saída
-        if num_cols == 0:
-             raise ValueError("Nenhuma coluna foi selecionada para a saída. Verifique o mapeamento.")
+        num_cols = len(output_headers)
+        if num_cols == 0: raise ValueError("Nenhuma coluna selecionada para a saída.")
 
-        # Inicializa a lista de dados e o mapa de linhas para estilos
         final_sheet_data = []
-        final_sheet_data.extend([([None] * num_cols)] * 2) # 2 Linhas em branco no topo
-        output_title = "TABELA DE PREÇOS" # Pode ser customizado se necessário
+        final_sheet_data.extend([([None] * num_cols)] * 2)
+        output_title = "TABELA DE PREÇOS"
         final_sheet_data.append([output_title] + [None] * (num_cols - 1))
-        final_sheet_data.append([None] * num_cols) # Linha em branco após título
-        row_map = {'title': 3, 'etapas': {}} # Mapeia linha Excel (base 1)
-        current_excel_row = len(final_sheet_data) + 1 # Próxima linha a ser escrita (base 1)
+        final_sheet_data.append([None] * num_cols)
+        row_map = {'title': 3, 'etapas': {}}
+        current_excel_row = len(final_sheet_data) + 1
 
-        # Loop principal para montar dados por Etapa e Bloco
         for etapa_idx, etapa_nome in enumerate(etapas_ordenadas):
             etapa_header_excel_row = current_excel_row
             row_map['etapas'][etapa_nome] = {'header_row': etapa_header_excel_row, 'blocks': {}}
-            final_sheet_data.append([etapa_nome] + [None] * (num_cols - 1)) # Header Etapa
-            final_sheet_data.append([None] * num_cols); current_excel_row += 2 # Linha branca abaixo, atualiza ponteiro
+            final_sheet_data.append([etapa_nome] + [None] * (num_cols - 1))
+            final_sheet_data.append([None] * num_cols); current_excel_row += 2
 
             blocos_desta_etapa = blocos_ordenados_por_etapa.get(etapa_nome, [])
             for bloco_idx, bloco_val_orig in enumerate(blocos_desta_etapa):
                 bloco_header_excel_row = current_excel_row
-                data_header_excel_row = current_excel_row + 2 # Cabeçalho dos dados 2 linhas abaixo
-                # Formata nome do bloco para exibição
+                data_header_excel_row = current_excel_row + 2
                 block_num = extract_block_number_safe(bloco_val_orig)
                 block_display_name = f"BLOCO {block_num:02d}" if block_num is not None else str(bloco_val_orig).upper()
+                final_sheet_data.append([block_display_name] + [None] * (num_cols - 1))
+                final_sheet_data.append([None] * num_cols);
+                final_sheet_data.append(output_headers)
+                current_excel_row += 3
 
-                final_sheet_data.append([block_display_name] + [None] * (num_cols - 1)) # Header Bloco
-                final_sheet_data.append([None] * num_cols); # Linha branca
-                final_sheet_data.append(output_headers) # Cabeçalhos dos dados (ex: UNIDADE, TIPOLOGIA...)
-                current_excel_row += 3 # Atualiza ponteiro (Header Bloco + Branca + Header Dados)
-
-                # Filtra dados do df_intermediate APENAS para este bloco específico
-                # Compara usando o valor original do bloco (string limpa)
                 df_bloco_data = df_intermediate[df_intermediate['BLOCO_ORIGINAL'] == bloco_val_orig].copy()
-                # Ordena os dados dentro do bloco pela coluna UNIDADE (alfanumericamente)
-                # Tenta extrair número da unidade para ordenação numérica primária
+                
                 def extract_unit_sort_key(unit_str):
                     unit_str = str(unit_str)
                     numbers = re.findall(r'\d+', unit_str)
                     try:
-                        # Retorna o primeiro número encontrado como int, ou float('inf') se nenhum número
                         num_part = int(numbers[0]) if numbers else float('inf')
                     except ValueError:
-                        num_part = float('inf') # Caso de número muito grande
-                    # Retorna tupla (número, string original) para ordenação estável
+                        num_part = float('inf')
                     return (num_part, unit_str)
 
-                if 'UNIDADE' in df_bloco_data.columns:
-                    df_bloco_data = df_bloco_data.sort_values(by='UNIDADE', key=lambda col: col.apply(extract_unit_sort_key))
+                # <<< INÍCIO DA MODIFICAÇÃO: Ordenar pela coluna correta >>>
+                if is_composite_unit_mode:
+                    # No modo composto, ordenamos pelo número da CASA
+                    sort_col = 'CASA_COMPOSITE'
+                else:
+                    # No modo padrão, ordenamos pela UNIDADE
+                    sort_col = 'UNIDADE'
+
+                if sort_col in df_bloco_data.columns:
+                    df_bloco_data = df_bloco_data.sort_values(by=sort_col, key=lambda col: col.apply(extract_unit_sort_key))
+                # <<< FIM DA MODIFICAÇÃO >>>
 
 
                 formatted_data_rows = []
-                # Itera sobre as linhas de dados filtradas e ordenadas para este bloco
                 for _, row in df_bloco_data.iterrows():
-                    processed_row = [] # Linha de saída para esta linha de entrada
-                    unidade_original_desta_linha = str(row.get('UNIDADE', ''))
-                    # A detecção global is_lote_file é usada aqui, não por linha
-                    is_lote_row_specific = 'lote' in unidade_original_desta_linha.lower() # Pode ser útil para lógicas futuras por linha
-
-                    # Itera sobre os identificadores (conceitos ou nomes extras) que vão para a saída
+                    processed_row = []
+                    
+                    # <<< INÍCIO DA MODIFICAÇÃO: Lógica de UNIDADE condicional >>>
                     for identifier in final_output_identifiers:
-                        original_value_str = str(row.get(identifier, '')) # Pega valor do df_intermediate
-                        processed_val = original_value_str # Valor padrão é o original
+                        processed_val = '' # Valor padrão
 
-                        # --- Lógica de formatação e override condicional ---
-                        if identifier == 'TIPOLOGIA' and is_lote_file: # Usa detecção global
-                            processed_val = "LOTEAMENTO" # Override para arquivos de lote
-                        elif identifier in ['AREA_CONSTRUIDA', 'QUINTAL']:
-                            numeric_value = parse_flexible_float(original_value_str)
-                            processed_val = format_area_m2(numeric_value)
-                        elif identifier == 'GARAGEM':
-                            numeric_value = parse_flexible_float(original_value_str)
-                            # Passa o valor original para usar como fallback ou texto
-                            processed_val = format_garagem_vagas(original_value_str, numeric_value)
-                        elif identifier == 'VALOR' or identifier in extra_col_names:
-                            # Tenta converter VALOR e COLUNAS EXTRAS para número
-                            numeric_value = parse_flexible_float(original_value_str)
-                            if numeric_value is not None:
-                                processed_val = numeric_value # Mantém como número para formatação Excel
-                            elif original_value_str.strip():
-                                # Se não converteu mas tinha texto, mantém o texto original
-                                # print(f"Aviso: Valor/Extra '{original_value_str}' em '{identifier}' mantido como texto.") # Debug
-                                processed_val = original_value_str.strip() # Mantém como string limpa
-                            else:
-                                processed_val = None # Deixa em branco (ou None) se era vazio/inválido
+                        if identifier == 'UNIDADE' and is_composite_unit_mode:
+                            # Se for modo composto, gera o nome da unidade dinamicamente
+                            processed_val = format_composite_unit_name(row)
+                        else:
+                            # Comportamento padrão para todas as outras colunas (incluindo UNIDADE no modo normal)
+                            original_value_str = str(row.get(identifier, ''))
+                            processed_val = original_value_str
 
-                        # Adiciona valor processado à linha de saída
+                            # --- Lógica de formatação e override condicional ---
+                            if identifier == 'TIPOLOGIA' and is_lote_file:
+                                processed_val = "LOTEAMENTO"
+                            elif identifier in ['AREA_CONSTRUIDA', 'QUINTAL']:
+                                numeric_value = parse_flexible_float(original_value_str)
+                                processed_val = format_area_m2(numeric_value)
+                            elif identifier == 'GARAGEM':
+                                numeric_value = parse_flexible_float(original_value_str)
+                                processed_val = format_garagem_vagas(original_value_str, numeric_value)
+                            elif identifier == 'VALOR' or identifier in extra_col_names:
+                                numeric_value = parse_flexible_float(original_value_str)
+                                if numeric_value is not None:
+                                    processed_val = numeric_value
+                                elif original_value_str.strip():
+                                    processed_val = original_value_str.strip()
+                                else:
+                                    processed_val = None
+                        
                         processed_row.append(processed_val)
+                    # <<< FIM DA MODIFICAÇÃO >>>
 
-                    formatted_data_rows.append(processed_row) # Adiciona linha processada à lista
+                    formatted_data_rows.append(processed_row)
 
-                final_sheet_data.extend(formatted_data_rows) # Adiciona todas as linhas formatadas deste bloco
+                final_sheet_data.extend(formatted_data_rows)
 
-                # Mapeia as linhas no Excel para permitir aplicação de estilos posterior
                 data_start_excel_row = data_header_excel_row + 1
                 data_end_excel_row = data_start_excel_row + len(formatted_data_rows) -1
                 row_map['etapas'][etapa_nome]['blocks'][bloco_val_orig] = {
@@ -462,257 +553,182 @@ def processar_tabela_precos_web(input_filepath, block_etapa_mapping):
                     'data_start': data_start_excel_row,
                     'data_end': data_end_excel_row
                 }
-                current_excel_row = data_end_excel_row + 1 # Atualiza ponteiro para a linha após os dados
+                current_excel_row = data_end_excel_row + 1
 
-                # Adiciona espaço entre blocos, se não for o último bloco desta etapa
                 if bloco_idx < len(blocos_desta_etapa) - 1:
                     final_sheet_data.append([None] * num_cols)
-                    current_excel_row += 1 # Incrementa pelo espaço adicionado
+                    current_excel_row += 1
 
-            # Adiciona espaço entre etapas, se não for a última etapa
             if etapa_idx < len(etapas_ordenadas) - 1:
-                final_sheet_data.append([None] * num_cols) # Duas linhas em branco
-                current_excel_row += 1 # Incrementa pelos espaços adicionados
+                final_sheet_data.append([None] * num_cols)
+                current_excel_row += 1
 
         # 6. Escrever no Excel e Aplicar Estilos Visuais
+        # O restante do código de estilização permanece IDÊNTICO, pois ele opera sobre a
+        # estrutura final `final_sheet_data` e `row_map`, que foram construídos corretamente.
         output = io.BytesIO()
         with pd.ExcelWriter(output, engine='openpyxl') as writer:
-            # Cria DataFrame a partir da lista de listas e escreve no Excel sem header/index
             df_final_sheet = pd.DataFrame(final_sheet_data)
             df_final_sheet.to_excel(writer, sheet_name='Tabela Formatada', index=False, header=False)
 
-            # Pega referências ao workbook e worksheet para aplicar estilos
             workbook = writer.book
             worksheet = writer.sheets['Tabela Formatada']
             print("  Aplicando estilos visuais...")
 
             # --- Definição de Estilos ---
-            # Cores (Exemplo: Azul escuro para Headers, Cinza claro alternado)
-            # Cores podem ser ajustadas conforme preferência visual
             header_bg_color = "FFFFFF" # Azul claro suave
             header_font_color = "000000" # Preto
             title_bg_color = "FFFFFF" # Azul mais escuro
             title_font_color = "000000" # Branco
 
-            # Estilos Base
             title_fill = PatternFill(start_color=title_bg_color, fill_type="solid")
             header_fill = PatternFill(start_color=header_bg_color, fill_type="solid")
-
             title_font = Font(name='Calibri', size=11, bold=True, color=title_font_color)
             etapa_bloco_header_font = Font(name='Calibri', size=11, bold=True, color=header_font_color)
             data_header_font = Font(name='Calibri', size=11, bold=True, color=header_font_color)
             data_font = Font(name='Calibri', size=11, bold=False, color="000000")
-
             center_align = Alignment(horizontal='center', vertical='center', wrap_text=True)
-            left_align = Alignment(horizontal='left', vertical='center', wrap_text=True) # Para Unidade/Tipologia?
-            right_align = Alignment(horizontal='right', vertical='center', wrap_text=False) # Para Valores
-
-            thin_border_side = Side(style='thin', color="B2B2B2") # Cinza para bordas internas
-            medium_border_side = Side(style='medium', color="000000") # Preto para bordas externas
-
-            # Bordas específicas (Exemplo: Contorno médio, internas finas)
+            left_align = Alignment(horizontal='left', vertical='center', wrap_text=True)
+            right_align = Alignment(horizontal='right', vertical='center', wrap_text=False)
+            thin_border_side = Side(style='thin', color="B2B2B2")
+            medium_border_side = Side(style='medium', color="000000")
             outer_border = Border(left=medium_border_side, right=medium_border_side, top=medium_border_side, bottom=medium_border_side)
-            data_header_border = Border(left=thin_border_side, right=thin_border_side, top=medium_border_side, bottom=medium_border_side) # Topo e Fundo Médios
-            data_cell_border = Border(left=thin_border_side, right=thin_border_side, top=thin_border_side, bottom=thin_border_side) # Todas finas
-
-            # Formatos numéricos
+            data_header_border = Border(left=thin_border_side, right=thin_border_side, top=medium_border_side, bottom=medium_border_side)
+            data_cell_border = Border(left=thin_border_side, right=thin_border_side, top=thin_border_side, bottom=thin_border_side)
             brl_currency_format = 'R$ #,##0.00'
             text_format = '@'
 
-            # --- Função Auxiliar para Estilizar Células Mescladas ---
             def style_merged_range(ws, cell_range_str, fill=None, font=None, alignment=None, border=None):
-                """Aplica estilos a um range mesclado (borda externa, fill/font/align na top-left)."""
                 min_col, min_row, max_col, max_row = range_boundaries(cell_range_str)
                 top_left_cell = ws.cell(row=min_row, column=min_col)
                 if fill: top_left_cell.fill = fill
                 if font: top_left_cell.font = font
                 if alignment: top_left_cell.alignment = alignment
-
-                # Aplica borda no perímetro do range mesclado
                 if border:
                     for row_idx in range(min_row, max_row + 1):
                         for col_idx in range(min_col, max_col + 1):
                             cell = ws.cell(row=row_idx, column=col_idx)
-                            current_border = cell.border.copy() # Preserva bordas existentes de outras células
+                            current_border = cell.border.copy()
                             if row_idx == min_row and border.top: current_border.top = border.top
                             if row_idx == max_row and border.bottom: current_border.bottom = border.bottom
                             if col_idx == min_col and border.left: current_border.left = border.left
                             if col_idx == max_col and border.right: current_border.right = border.right
                             cell.border = current_border
 
-            # --- Aplicação Principal de Estilos ---
-            # Título Principal (Mesclado)
             title_row = row_map['title']
             title_range_str = f"A{title_row}:{get_column_letter(num_cols)}{title_row}"
-            if num_cols > 0: # Só mescla se houver colunas
+            if num_cols > 0:
                 worksheet.merge_cells(title_range_str)
                 style_merged_range(worksheet, title_range_str, fill=title_fill, font=title_font, alignment=center_align, border=outer_border)
 
-            # Identifica dinamicamente quais colunas de saída devem receber formato de moeda ou texto
             currency_col_indices_1based = []
-            text_col_indices_1based = [] # Colunas que devem ser explicitamente texto
-            numeric_col_indices_1based = [] # Colunas numéricas (não moeda) como área
-            alignment_map = {} # Mapeia índice (1-based) para alinhamento
+            text_col_indices_1based = []
+            numeric_col_indices_1based = []
+            alignment_map = {}
 
             for i, header_name in enumerate(output_headers):
                 identifier = final_output_identifiers[i]
                 col_idx_1based = i + 1
-
-                # Define formato
                 if identifier == 'VALOR' or identifier in extra_col_names:
-                    # Tenta tratar Valor e Extras como moeda por padrão se forem numéricos
                     currency_col_indices_1based.append(col_idx_1based)
-                    alignment_map[col_idx_1based] = right_align # Alinha moeda à direita
+                    alignment_map[col_idx_1based] = right_align
                 elif identifier in ['AREA_CONSTRUIDA', 'QUINTAL']:
-                     # Áreas podem ser tratadas como texto ('-- m²') ou número se precisasse de cálculo
-                     # Como formatamos como string com 'm²', trataremos como texto para alinhamento
                      text_col_indices_1based.append(col_idx_1based)
-                     alignment_map[col_idx_1based] = center_align # Centraliza áreas
+                     alignment_map[col_idx_1based] = center_align
                 elif identifier in ['UNIDADE', 'TIPOLOGIA', 'GARAGEM']:
                      text_col_indices_1based.append(col_idx_1based)
-                     alignment_map[col_idx_1based] = left_align if identifier in ['TIPOLOGIA'] else center_align # Alinha Tipologia à esquerda
-
-                # Define alinhamento padrão (se não definido acima)
+                     alignment_map[col_idx_1based] = left_align if identifier in ['TIPOLOGIA'] else center_align
                 if col_idx_1based not in alignment_map:
                     alignment_map[col_idx_1based] = center_align
-
 
             print(f"   Índices (1-based) Formato Moeda: {currency_col_indices_1based}")
             print(f"   Índices (1-based) Formato Texto: {text_col_indices_1based}")
 
-            # Itera sobre Etapas e Blocos no mapa de linhas para aplicar estilos
-            table_counter = 1 # Contador para nomes de tabela únicos
+            table_counter = 1
             for etapa_nome, etapa_info in row_map['etapas'].items():
-                # Cabeçalho da Etapa (Mesclado)
                 etapa_header_r = etapa_info['header_row']
                 etapa_range_str = f"A{etapa_header_r}:{get_column_letter(num_cols)}{etapa_header_r}"
                 if num_cols > 0:
                     worksheet.merge_cells(etapa_range_str)
                     style_merged_range(worksheet, etapa_range_str, fill=header_fill, font=etapa_bloco_header_font, alignment=center_align, border=outer_border)
 
-                # Itera sobre os blocos desta etapa
                 for bloco_val_orig, rows_info in etapa_info['blocks'].items():
                     bloco_header_r = rows_info['bloco_header']
                     data_header_r = rows_info['data_header']
                     data_start_r = rows_info['data_start']
                     data_end_r = rows_info['data_end']
 
-                    # Cabeçalho do Bloco (Mesclado)
                     bloco_range_str = f"A{bloco_header_r}:{get_column_letter(num_cols)}{bloco_header_r}"
                     if num_cols > 0:
                         worksheet.merge_cells(bloco_range_str)
                         style_merged_range(worksheet, bloco_range_str, fill=header_fill, font=etapa_bloco_header_font, alignment=center_align, border=outer_border)
 
-                    # --- Aplica Estilo de Tabela (para zebra e filtros) ---
-                    if data_start_r <= data_end_r: # Só cria tabela se houver dados
+                    if data_start_r <= data_end_r:
                         start_col_letter = get_column_letter(1)
                         end_col_letter = get_column_letter(num_cols)
                         table_range = f"{start_col_letter}{data_header_r}:{end_col_letter}{data_end_r}"
-                        # Nome da tabela mais simples e único
                         table_name = f"Tabela_{table_counter}"
                         table_counter += 1
-
                         tab = Table(displayName=table_name, ref=table_range)
-                        # Estilo de tabela: 'TableStyleMedium9' é um exemplo com azul e linhas alternadas
-                        # Consulte a documentação do Openpyxl ou teste estilos no Excel para ver opções
-                        style = TableStyleInfo(name="TableStyleLight1", # Exemplo: Azul Médio
-                                            showFirstColumn=False,
-                                            showLastColumn=False,
-                                            showRowStripes=True, # Habilita linhas zebradas
-                                            showColumnStripes=False)
+                        style = TableStyleInfo(name="TableStyleLight1", showFirstColumn=False, showLastColumn=False, showRowStripes=True, showColumnStripes=False)
                         tab.tableStyleInfo = style
                         worksheet.add_table(tab)
                         print(f"   Aplicado Estilo Tabela '{style.name}' range {table_range} (Nome: {table_name})")
 
-                    # --- Formatação Manual Adicional (Cabeçalho Dados e Células Dados) ---
-                    # (Necessário para fontes, alinhamentos, formatos específicos que o TableStyle não cobre totalmente)
-
-                    # Cabeçalho dos Dados (Estilo célula a célula sobrepõe parcialmente o TableStyle se necessário)
                     for c_idx_1based in range(1, num_cols + 1):
                         cell = worksheet.cell(row=data_header_r, column=c_idx_1based)
                         cell.font = data_header_font
-                        cell.alignment = alignment_map.get(c_idx_1based, center_align) # Usa mapa de alinhamento
-                        # A cor de fundo e bordas do cabeçalho são geralmente definidas pelo TableStyle,
-                        # mas podemos forçar se necessário:
-                        # cell.fill = data_header_fill
-                        # cell.border = data_header_border
-
-                    # Linhas de Dados (Formatação célula a célula)
+                        cell.alignment = alignment_map.get(c_idx_1based, center_align)
+                    
                     for r in range(data_start_r, data_end_r + 1):
                         for c_idx_1based in range(1, num_cols + 1):
                             cell = worksheet.cell(row=r, column=c_idx_1based)
                             cell.font = data_font
                             cell.alignment = alignment_map.get(c_idx_1based, center_align)
-                            # Aplica formato moeda ou texto
                             if c_idx_1based in currency_col_indices_1based and isinstance(cell.value, (int, float, np.number)):
                                 cell.number_format = brl_currency_format
                             elif c_idx_1based in text_col_indices_1based:
                                  cell.number_format = text_format
 
                     if data_start_r <= data_end_r and num_cols > 0:
-                        outer_border_start_row = data_header_r # Começa no cabeçalho da tabela
-                        outer_border_end_row = data_end_r       # Termina na última linha de dados
-
+                        outer_border_start_row = data_header_r
+                        outer_border_end_row = data_end_r
                         for row_idx in range(outer_border_start_row, outer_border_end_row + 1):
                             for col_idx_1based in range(1, num_cols + 1):
                                 cell = worksheet.cell(row=row_idx, column=col_idx_1based)
-                                # Copia a borda existente para preservar linhas internas do TableStyle
                                 current_border = cell.border.copy()
-
-                                # Aplica LADO MÉDIO SOMENTE NA PERIMETRIA DA ÁREA DE DADOS
                                 is_top_data_row = (row_idx == outer_border_start_row)
                                 is_bottom_data_row = (row_idx == outer_border_end_row)
                                 is_left_col = (col_idx_1based == 1)
                                 is_right_col = (col_idx_1based == num_cols)
-
-                                if is_top_data_row:
-                                    current_border.top = medium_border_side
-                                if is_bottom_data_row:
-                                    current_border.bottom = medium_border_side
-                                if is_left_col:
-                                    current_border.left = medium_border_side
-                                if is_right_col:
-                                    current_border.right = medium_border_side
-
+                                if is_top_data_row: current_border.top = medium_border_side
+                                if is_bottom_data_row: current_border.bottom = medium_border_side
+                                if is_left_col: current_border.left = medium_border_side
+                                if is_right_col: current_border.right = medium_border_side
                                 cell.border = current_border
 
-                                # Bordas podem ser controladas pelo Table Style, mas podemos adicionar aqui se necessário
-                                # Ex: cell.border = data_cell_border
-
-            # --- Ajuste de Largura das Colunas ---
-            concept_widths = { # Larguras preferenciais (ajuste conforme necessário)
-                'UNIDADE': 12, 'TIPOLOGIA': 40, 'ÁREA CONSTRUIDA': 15,
+            concept_widths = {
+                'UNIDADE': 22, 'TIPOLOGIA': 40, 'ÁREA CONSTRUIDA': 15, # Aumentei UNIDADE
                 'QUINTAL': 12, 'GARAGEM': 15, 'VALOR': 18
             }
-            extra_widths = { # Larguras específicas para colunas extras conhecidas
-                # Adicione aqui pelo NOME ORIGINAL da coluna extra
-                # Ex: 'NOME_COLUNA_EXTRA_1': 15,
-            }
-            default_extra_width = 15 # Largura padrão para extras não mapeadas
+            extra_widths = {}
+            default_extra_width = 15
 
             print("   Ajustando larguras das colunas...")
-            for i, header_name in enumerate(output_headers): # Itera sobre os headers REAIS da saída
+            for i, header_name in enumerate(output_headers):
                 col_letter = get_column_letter(i + 1)
-                identifier = final_output_identifiers[i] # Pega o identificador original (conceito ou nome extra)
-
-                # Lógica para determinar a largura:
+                identifier = final_output_identifiers[i]
                 width = None
-                # 1. Tenta largura específica para o CONCEITO padrão
                 if identifier in concept_widths:
                     width = concept_widths[identifier]
-                # 2. Se não, tenta largura específica para o NOME EXTRA original
                 elif identifier in extra_widths:
                      width = extra_widths[identifier]
-                # 3. Se não, usa largura padrão para CONCEITO padrão (se aplicável)
                 elif identifier in header_map and header_map[identifier] in concept_widths:
-                     width = concept_widths[header_map[identifier]] # Usa o nome bonito mapeado
-                # 4. Se for coluna extra não mapeada, usa default
+                     width = concept_widths[header_map[identifier]]
                 elif identifier in extra_col_names:
                     width = default_extra_width
-                # 5. Fallback final (caso algum conceito padrão não esteja em concept_widths)
                 else:
                     width = default_extra_width
-
                 if width:
                     try:
                         worksheet.column_dimensions[col_letter].width = width
@@ -721,20 +737,15 @@ def processar_tabela_precos_web(input_filepath, block_etapa_mapping):
 
             print("  Estilos visuais finais aplicados.")
 
-        # Retorna o stream de bytes do Excel gerado
         output.seek(0)
         print(f"(Tabela Preços Formatador - v_Lote_Extras_Refined) Processamento concluído.")
         return output
 
-    # --- Blocos de Tratamento de Erro ---
     except ValueError as ve:
-        # Erros esperados (ex: coluna não encontrada, arquivo inválido, sem dados)
         print(f"(Tabela Preços Formatador) ERRO VALIDAÇÃO: {ve}")
-        traceback.print_exc() # Mostra detalhes do erro no log
-        raise ve # Re-lança para ser tratado pela aplicação (mostrar flash message)
+        traceback.print_exc()
+        raise ve
     except Exception as e:
-        # Erros inesperados durante o processamento
         print(f"(Tabela Preços Formatador) ERRO INESPERADO: {e}")
         traceback.print_exc()
-        # Lança um erro genérico
         raise RuntimeError(f"Erro inesperado no formatador de tabela de preços: {e}") from e

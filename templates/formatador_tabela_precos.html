@@ -245,6 +245,28 @@ title %}Formatar Tabela de Preços{% endblock %} {% block styles %} {{ super() }
     </form>
   </div>
 </div>
+
+<BR></BR>
+
+    {# --- NOVA SEÇÃO DE DESFORMATAR --- #}
+    <h1>Desformatar Tabela de Preços</h1>
+    <div class="description">
+      <p><strong>Instruções (Desformatar):</strong> Faça o upload de uma Tabela de Preços já estilizada (o arquivo .xlsx gerado pela ferramenta acima) para extrair os dados puros em um formato de tabela simples (CSV).</p>
+    </div>
+    <div class="form-container">
+        <form method="post" enctype="multipart/form-data" action="{{ url_for('desformatador_tabela_precos_tool') }}"> {# <<< NOVA ROTA #}
+             <div class="mb-3">
+                <label for="arquivo_formatado" class="form-label"><strong>Selecione a Tabela Formatada (.xlsx):</strong></label>
+                <input type="file" class="form-control" id="arquivo_formatado" name="arquivo_formatado" accept=".xlsx" required />
+             </div>
+             <div style="text-align: center; margin-top: 30px;">
+                <button type="submit" class="btn btn-warning btn-lg"> {# Botão com cor diferente #}
+                    <i class="fas fa-undo-alt me-2"></i> Desformatar e Extrair Dados
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
 {% endblock %} {% block scripts %} {{ super() }}
 <script>
   document.addEventListener("DOMContentLoaded", function () {
