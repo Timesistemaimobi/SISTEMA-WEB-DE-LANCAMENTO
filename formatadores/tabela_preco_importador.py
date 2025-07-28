@@ -12,12 +12,9 @@ import csv
 def parse_numeric(value):
     """Limpa string e tenta converter para float. Retorna NaN em caso de erro."""
     if pd.isna(value) or value == '':
-        return pd.NA # Usar pd.NA que é mais consistente que np.nan para nullable int/float
+        return pd.NA
     s_val = str(value).strip()
-    # Remove letras exceto E (para notação científica), R, $ e espaços
-    # Preserva dígitos, ponto, vírgula e sinal negativo
     s_val = re.sub(r'[a-df-zA-DF-Z R$]', '', s_val)
-    # Troca vírgula decimal por ponto
     if ',' in s_val and '.' in s_val:
         s_val = s_val.replace('.', '').replace(',', '.')
     elif ',' in s_val:
@@ -25,21 +22,17 @@ def parse_numeric(value):
     try:
         return float(s_val)
     except (ValueError, TypeError):
-        # print(f"Aviso parse_numeric: Não converteu '{value}' para número.") # Reduzir verbosidade
-        return pd.NA # Retorna Nulo do Pandas em caso de erro
+        return pd.NA
 
 def normalize_text_for_match(text):
     """Normaliza texto para busca: minúsculo, sem acentos, sem não-alfanuméricos."""
     if not isinstance(text, str): text = str(text)
     try:
-        # Normaliza para decompor acentos, codifica/decodifica para remover, põe em minúsculo
         text = unicodedata.normalize('NFKD', text).encode('ASCII', 'ignore').decode('ASCII')
         text = text.lower()
-        # Remove tudo que não for letra ou número
         text = re.sub(r'[^a-z0-9]', '', text)
         return text.strip()
     except Exception:
-        # Fallback muito básico se a normalização falhar
         return str(text).lower().strip().replace(' ', '')
 
 def find_column_flexible(df_columns, concept_keywords, concept_name, required=True):
@@ -48,7 +41,7 @@ def find_column_flexible(df_columns, concept_keywords, concept_name, required=Tr
     space-insensitive, partial match).
     """
     normalized_input_cols = {normalize_text_for_match(col): col for col in df_columns}
-    print(f"  Buscando '{concept_name}': Keywords={concept_keywords}. Colunas Norm.: {list(normalized_input_cols.keys())}") # Debug
+    print(f"  Buscando '{concept_name}': Keywords={concept_keywords}. Colunas Norm.: {list(normalized_input_cols.keys())}")
     found_col_name = None
 
     # 1. Match exato normalizado
@@ -57,36 +50,28 @@ def find_column_flexible(df_columns, concept_keywords, concept_name, required=Tr
         if norm_keyword in normalized_input_cols:
             found_col_name = normalized_input_cols[norm_keyword]
             print(f"    -> Match exato norm. '{norm_keyword}' para '{concept_name}'. Col original: '{found_col_name}'")
-            return found_col_name # Retorna imediatamente no match exato
+            return found_col_name
 
-    # 2. Match parcial normalizado (se não houve exato)
+    # 2. Match parcial normalizado
     potential_matches = []
     for keyword in concept_keywords:
         norm_keyword = normalize_text_for_match(keyword)
-        if not norm_keyword: continue # Pula keywords vazias após normalização
-
+        if not norm_keyword: continue
         for norm_col, orig_col in normalized_input_cols.items():
-            if not norm_col: continue # Pula colunas vazias após normalização
-
-            # Verifica se a keyword normalizada está contida na coluna normalizada
+            if not norm_col: continue
             if norm_keyword in norm_col:
-                 # Prioridade 0 se começa com a keyword, 1 caso contrário
                  priority = 0 if norm_col.startswith(norm_keyword) else 1
                  potential_matches.append((priority, orig_col))
-                 # Debug: mostra candidatos
-                 # print(f"    -> Match parcial candidato: '{keyword}' em '{orig_col}' (Norm: '{norm_keyword}' em '{norm_col}') Prio:{priority}")
-
     if potential_matches:
-        potential_matches.sort() # Ordena por prioridade (0 vem primeiro)
-        found_col_name = potential_matches[0][1] # Pega a melhor correspondência (primeira da lista ordenada)
+        potential_matches.sort()
+        found_col_name = potential_matches[0][1]
         print(f"    -> Melhor match parcial para '{concept_name}'. Col original: '{found_col_name}'")
         return found_col_name
 
-    # 3. Erro se obrigatório e não encontrado (nenhum match exato ou parcial)
+    # 3. Erro se obrigatório e não encontrado
     if required:
         raise ValueError(f"Coluna obrigatória '{concept_name}' não encontrada. Keywords usadas: {concept_keywords}. Colunas originais: {list(df_columns)}")
     else:
-        # Se não for obrigatório, apenas informa e retorna None
         print(f"    -> Coluna opcional '{concept_name}' não encontrada.")
         return None
 
@@ -96,80 +81,103 @@ def normalize_text(text):
     """Normaliza texto removendo acentos e convertendo para maiúsculas."""
     if not isinstance(text, str): text = str(text)
     try:
-        # Tenta normalizar e remover acentos
         text = unicodedata.normalize('NFKD', text).encode('ASCII', 'ignore').decode('ASCII')
         return text.upper().strip()
     except Exception as e:
-        # Fallback simples se a normalização falhar
         print(f"Aviso: Falha ao normalizar texto '{text}'. Erro: {e}")
         return str(text).upper().strip()
 
-# --- formatar_nome_unidade é usada apenas por processar_preco_incorporacao ---
-def formatar_nome_unidade(row):
-    """Formata o nome da unidade (BLXX - APT YY ou com PCD), verificando PCD em APT e TIPOLOGIA."""
-    bloco_val = row.get('BLOCO_INPUT', '')
-    apt_val = row.get('APT_INPUT', '')
-    tipologia_val = row.get('TIPOLOGIA_INPUT', '') # Usado para checar 'PCD'
+# <<< ADICIONADO >>>
+# Funções auxiliares portadas do tabela_precos_formatador.py para dar suporte ao modo composto.
+def extract_block_number_safe(block_value_str):
+    """Extrai o primeiro número de uma string de bloco/quadra/casa."""
+    if not isinstance(block_value_str, str): block_value_str = str(block_value_str)
+    match = re.search(r'\d+', block_value_str)
+    if match:
+        try: return int(match.group(0))
+        except ValueError: return None
+    return None
 
-    is_pcd = False # Flag para indicar se é PCD
-    if pd.notna(tipologia_val):
-        tipologia_norm = normalize_text(str(tipologia_val))
-        if 'PCD' in tipologia_norm: is_pcd = True
-        # print(f"DEBUG PCD Check (Tipo): Bloco='{bloco_val}', Apt='{apt_val}', Tipo Norm='{tipologia_norm}', IsPCD={is_pcd}") # DEBUG
-    if not is_pcd and pd.notna(apt_val):
-         apt_norm = normalize_text(str(apt_val))
-         if 'PCD' in apt_norm: is_pcd = True
-         # print(f"DEBUG PCD Check (Apt): Bloco='{bloco_val}', Apt='{apt_val}', Apt Norm='{apt_norm}', IsPCD={is_pcd}") # DEBUG
+def formatar_nome_unidade_composto(row, col_bloco_name, col_quadra_name, col_casa_name):
+    """
+    Gera o nome da unidade no formato composto (BL/US-QD-CS).
+    """
+    try:
+        bloco_val = str(row.get(col_bloco_name, ''))
+        quadra_val = str(row.get(col_quadra_name, ''))
+        casa_val = str(row.get(col_casa_name, ''))
+
+        quadra_num = extract_block_number_safe(quadra_val)
+        bloco_num = extract_block_number_safe(bloco_val) # Será None para o valor 'US'
+        casa_num = extract_block_number_safe(casa_val)
+
+        quadra_str = f"QD{quadra_num:02d}" if quadra_num is not None else "QD??"
+        casa_str = f"CS{casa_num:02d}" if casa_num is not None else "CS??"
+        
+        prefixo_str = ""
+        # Regra especial: se o valor do bloco for 'US', o prefixo muda
+        if bloco_val.strip().upper() == 'US':
+            prefixo_str = f"US{casa_num:02d}" if casa_num is not None else "US??"
+        else:
+            # Para qualquer outro valor, usa 'BL' com o número do bloco
+            prefixo_str = f"BL{bloco_num:02d}" if bloco_num is not None else "BL??"
+        
+        return f"{prefixo_str}-{quadra_str}-{casa_str}"
+    except Exception as e:
+        print(f"AVISO: Erro ao gerar nome de unidade composto: {e}")
+        return "ERRO_UNIDADE_COMPOSTA"
+# <<< FIM ADIÇÃO >>>
+
+def formatar_nome_unidade_generico(row, col_ident_1_name, col_ident_2_name, col_tipologia_name, prefixo_1, prefixo_2):
+    """
+    Formata o nome da unidade (PREFIXO1 XX - PREFIXO2 YY ou com PCD),
+    usando os prefixos e nomes de colunas fornecidos.
+    """
+    # (Esta função permanece inalterada)
+    ident_1_val = row.get(col_ident_1_name, '')
+    ident_2_val = row.get(col_ident_2_name, '')
+    tipologia_val = row.get(col_tipologia_name, '')
+    is_pcd = False
+    if pd.notna(tipologia_val) and 'PCD' in normalize_text(str(tipologia_val)): is_pcd = True
+    if not is_pcd and pd.notna(ident_2_val) and 'PCD' in normalize_text(str(ident_2_val)): is_pcd = True
     pcd_suffix = " (PCD)" if is_pcd else ""
-
-    if pd.notna(bloco_val) and str(bloco_val).strip() and pd.notna(apt_val) and str(apt_val).strip():
+    if pd.notna(ident_1_val) and str(ident_1_val).strip() and pd.notna(ident_2_val) and str(ident_2_val).strip():
         try:
-            bloco_num_match = re.search(r'\d+', str(bloco_val)); bloco_num_str = f"{int(bloco_num_match.group(0)):02d}" if bloco_num_match else str(bloco_val).strip() if str(bloco_val).strip() else "??"
-            bloco_str = f"BL{bloco_num_str}"
-            apt_num_match = re.search(r'\d+', str(apt_val)); apt_num_str = f"{int(apt_num_match.group(0)):02d}" if apt_num_match else str(apt_val).strip() if str(apt_val).strip() else "??"
-            apt_str = f"APT {apt_num_str}"
-            apt_str_cleaned = re.sub(r'\s?\(PCD\)', '', apt_str, flags=re.IGNORECASE).strip()
-            return f"{bloco_str} - {apt_str_cleaned}{pcd_suffix}"
+            ident_1_num_match = re.search(r'\d+', str(ident_1_val)); ident_1_num_str = f"{int(ident_1_num_match.group(0)):02d}" if ident_1_num_match else str(ident_1_val).strip()
+            ident_1_str = f"{prefixo_1}{ident_1_num_str}"
+            ident_2_num_match = re.search(r'\d+', str(ident_2_val)); ident_2_num_str = f"{int(ident_2_num_match.group(0)):02d}" if ident_2_num_match else str(ident_2_val).strip()
+            ident_2_str = f"{prefixo_2} {ident_2_num_str}"
+            ident_2_str_cleaned = re.sub(r'\s?\(PCD\)', '', ident_2_str, flags=re.IGNORECASE).strip()
+            return f"{ident_1_str} - {ident_2_str_cleaned}{pcd_suffix}"
         except Exception as e:
-            print(f"Erro formatar_nome_unidade: {e} para Bloco '{bloco_val}', Apt '{apt_val}'")
-            bloco_s = str(bloco_val).strip(); apt_s = str(apt_val).strip(); apt_s_cleaned = re.sub(r'\s?\(PCD\)', '', apt_s, flags=re.IGNORECASE).strip(); return f"BL{bloco_s} - APT {apt_s_cleaned}{pcd_suffix}" # Fallback
+            print(f"Erro formatar_nome_unidade_generico: {e} para {col_ident_1_name}='{ident_1_val}', {col_ident_2_name}='{ident_2_val}'")
+            ident_1_s = str(ident_1_val).strip(); ident_2_s = str(ident_2_val).strip()
+            ident_2_s_cleaned = re.sub(r'\s?\(PCD\)', '', ident_2_s, flags=re.IGNORECASE).strip()
+            return f"{prefixo_1}{ident_1_s} - {prefixo_2} {ident_2_s_cleaned}{pcd_suffix}"
     return "UNIDADE_ERRO"
 
 def format_brl(value):
     """Converte valor numérico ou string para formato moeda BRL (R$ #.###,##) de forma manual."""
+    # (Esta função permanece inalterada)
     if pd.isna(value) or value == '': return ''
     s_val = str(value).strip()
-    if re.search(r'[a-gi-qs-zA-GI-QS-Z]', s_val):
-        # print(f"Aviso format_brl: Valor '{value}' contém letras inesperadas. Retornando vazio.") # Reduzir verbosidade
-        return ''
-    s_val = re.sub(r'[^\d,.-]', '', s_val) # Remove tudo exceto dígitos, vírgula, ponto, sinal
+    if re.search(r'[a-gi-qs-zA-GI-QS-Z]', s_val): return ''
+    s_val = re.sub(r'[^\d,.-]', '', s_val)
     if ',' in s_val and '.' in s_val: s_val = s_val.replace('.', '').replace(',', '.')
     elif ',' in s_val: s_val = s_val.replace(',', '.')
-
     try:
         num = float(s_val)
-        # --- Formatação Manual Explícita ---
-        valor_com_decimal = f"{num:.2f}".replace('.', ',')
-        partes = valor_com_decimal.split(',')
-        parte_inteira = partes[0]
-        # Lida com números negativos corretamente
-        sinal = ""
-        if parte_inteira.startswith('-'):
-            sinal = "-"
-            parte_inteira = parte_inteira[1:] # Remove sinal para formatar
-
-        parte_decimal = partes[1]
-        parte_inteira_com_milhar = ""
+        valor_com_decimal = f"{num:.2f}".replace('.', ','); partes = valor_com_decimal.split(',')
+        parte_inteira = partes[0]; sinal = ""
+        if parte_inteira.startswith('-'): sinal = "-"; parte_inteira = parte_inteira[1:]
+        parte_decimal = partes[1]; parte_inteira_com_milhar = ""
         n_digitos = len(parte_inteira)
         for i, digito in enumerate(parte_inteira):
             parte_inteira_com_milhar += digito
-            if (n_digitos - 1 - i) > 0 and (n_digitos - 1 - i) % 3 == 0: # Adiciona ponto a cada 3 digitos da dir p/ esq (exceto no inicio)
+            if (n_digitos - 1 - i) > 0 and (n_digitos - 1 - i) % 3 == 0:
                 parte_inteira_com_milhar += "."
         return f"R$ {sinal}{parte_inteira_com_milhar},{parte_decimal}"
-        # --- Fim da Formatação Manual ---
-    except (ValueError, TypeError):
-        # print(f"Aviso format_brl: Não converteu '{value}' para número após limpeza. Retornando vazio.") # Reduzir verbosidade
-        return ''
+    except (ValueError, TypeError): return ''
 
 def format_area(value):
     """
@@ -199,70 +207,45 @@ def format_area(value):
         # Formata para duas casas decimais e troca ponto por vírgula para o padrão BR
         formatted_area = f"{num:.2f}".replace('.', ',')
         # Encapsula para forçar texto no Excel
-        return f'="{formatted_area}"' # <<< MUDANÇA PRINCIPAL AQUI
+        return f'="{formatted_area}"'
     except (ValueError, TypeError):
         # Se a conversão falhar, retorna vazio
         print(f"Aviso format_area: Não converteu valor limpo '{s_val}' (original: '{original_value_str}') para float. Retornando vazio.")
         return ''
     
-def formatar_nome_unidade_generico(row, col_ident_1_name, col_ident_2_name, col_tipologia_name, prefixo_1, prefixo_2):
+    # <<< ADICIONADO >>>
+# Nova função auxiliar para tratar o nome do bloco de saída, incluindo o caso especial.
+def formatar_nome_bloco_saida(bloco_original_valor, prefixo_completo):
     """
-    Formata o nome da unidade (PREFIXO1 XX - PREFIXO2 YY ou com PCD),
-    usando os prefixos e nomes de colunas fornecidos.
-    Verifica PCD em TIPOLOGIA e no IDENTIFICADOR 2.
+    Formata o nome do bloco para a coluna de saída.
+    Trata o caso especial 'CASAS SOLTAS' e, caso contrário, formata com prefixo e número.
     """
-    ident_1_val = row.get(col_ident_1_name, '')
-    ident_2_val = row.get(col_ident_2_name, '')
-    tipologia_val = row.get(col_tipologia_name, '') # Usado para checar 'PCD'
+    # Normaliza o valor de entrada para uma comparação robusta
+    valor_normalizado = str(bloco_original_valor).strip().upper()
 
-    is_pcd = False # Flag para indicar se é PCD
-    # 1. Checa PCD na Tipologia
-    if pd.notna(tipologia_val):
-        tipologia_norm = normalize_text(str(tipologia_val)) # Usa normalize_text (UPPER, sem acento)
-        if 'PCD' in tipologia_norm: is_pcd = True
-        # print(f"DEBUG PCD Check (Tipo): {ident_1_val=}, {ident_2_val=}, Tipo Norm='{tipologia_norm}', IsPCD={is_pcd}") # DEBUG
-
-    # 2. Checa PCD no Identificador 2 (se não achou na tipologia)
-    if not is_pcd and pd.notna(ident_2_val):
-         ident_2_norm = normalize_text(str(ident_2_val)) # Usa normalize_text (UPPER, sem acento)
-         if 'PCD' in ident_2_norm: is_pcd = True
-         # print(f"DEBUG PCD Check (Ident 2): {ident_1_val=}, {ident_2_val=}, Ident2 Norm='{ident_2_norm}', IsPCD={is_pcd}") # DEBUG
-
-    pcd_suffix = " (PCD)" if is_pcd else ""
-
-    if pd.notna(ident_1_val) and str(ident_1_val).strip() and pd.notna(ident_2_val) and str(ident_2_val).strip():
+    # 1. Verifica a condição especial
+    if valor_normalizado == 'US':
+        # Retorna o valor específico solicitado, forçando como texto no Excel
+        return '="UNID. SOLTAS"'
+    
+    # 2. Se não for a condição especial, aplica a lógica padrão
+    else:
         try:
-            # Extrai número do Identificador 1 (Bloco/Quadra)
-            ident_1_num_match = re.search(r'\d+', str(ident_1_val))
-            ident_1_num_str = f"{int(ident_1_num_match.group(0)):02d}" if ident_1_num_match else str(ident_1_val).strip() if str(ident_1_val).strip() else "??"
-            ident_1_str = f"{prefixo_1}{ident_1_num_str}" # Usa o prefixo determinado
+            # Extrai o primeiro número encontrado no valor original
+            num_match = re.search(r'\d+', str(bloco_original_valor))
+            # Formata o número com 2 dígitos se encontrado, senão usa um placeholder
+            num_str = f"{int(num_match.group(0)):02d}" if num_match else "00"
+            # Retorna o formato padrão, forçando como texto no Excel
+            return f'="{prefixo_completo} {num_str}"'
+        except (ValueError, TypeError):
+            # Fallback em caso de erro na conversão
+            return f'="{prefixo_completo} ERRO"'
 
-            # Extrai número do Identificador 2 (Apto/Casa)
-            ident_2_num_match = re.search(r'\d+', str(ident_2_val))
-            ident_2_num_str = f"{int(ident_2_num_match.group(0)):02d}" if ident_2_num_match else str(ident_2_val).strip() if str(ident_2_val).strip() else "??"
-            ident_2_str = f"{prefixo_2} {ident_2_num_str}" # Usa o prefixo determinado
-
-            # Remove "(PCD)" do identificador 2 antes de adicionar o sufixo (para evitar duplicação)
-            ident_2_str_cleaned = re.sub(r'\s?\(PCD\)', '', ident_2_str, flags=re.IGNORECASE).strip()
-
-            return f"{ident_1_str} - {ident_2_str_cleaned}{pcd_suffix}"
-        except Exception as e:
-            print(f"Erro formatar_nome_unidade_generico: {e} para {col_ident_1_name}='{ident_1_val}', {col_ident_2_name}='{ident_2_val}'")
-            # Fallback mais robusto usando os prefixos
-            ident_1_s = str(ident_1_val).strip()
-            ident_2_s = str(ident_2_val).strip()
-            ident_2_s_cleaned = re.sub(r'\s?\(PCD\)', '', ident_2_s, flags=re.IGNORECASE).strip()
-            return f"{prefixo_1}{ident_1_s} - {prefixo_2} {ident_2_s_cleaned}{pcd_suffix}"
-    elif pd.notna(ident_1_val) and str(ident_1_val).strip(): # Caso tenha só o primeiro identificador
-         print(f"Aviso: Unidade com apenas identificador 1: '{ident_1_val}'")
-         return f"{prefixo_1}{str(ident_1_val).strip()}_INCOMPLETO"
-    return "UNIDADE_ERRO" # Retorna erro se faltar informação crucial
-
-# --- Função Principal para Tabela Incorporação ---
+# --- Função Principal para Tabela Incorporação (MODIFICADA) ---
 def processar_preco_incorporacao(input_filepath, selected_valor_column_name):
     """
-    Lê Excel incorporação, processa (identificando Bloco/Quadra e Apto/Casa),
-    e retorna StringIO CSV.
+    Lê Excel incorporação, processa, e retorna StringIO CSV.
+    MODIFICADO: Detecta modo composto e trata o caso especial 'CASAS SOLTAS' para a coluna BLOCO.
     """
     print(f"(Preço Incorporação) Iniciando: {input_filepath}, Col Valor: '{selected_valor_column_name}'")
     try:
@@ -273,83 +256,102 @@ def processar_preco_incorporacao(input_filepath, selected_valor_column_name):
             df_input = df_input.dropna(how='all').reset_index(drop=True)
             df_input = df_input.dropna(axis=1, how='all')
         except Exception as e_read:
-            raise ValueError(f"Falha ao ler Excel (linha cabeçalho={header_row}). Verifique o arquivo e a linha do cabeçalho.") from e_read
+            raise ValueError(f"Falha ao ler Excel (linha cabeçalho={header_row}). Verifique o arquivo.") from e_read
 
         if df_input.empty: raise ValueError("Arquivo vazio ou sem dados após leitura inicial.")
         print(f"(Preço Incorporação) Lidas {len(df_input)} linhas válidas.")
         df_input.columns = df_input.columns.str.strip(); print(f"Colunas: {df_input.columns.tolist()}")
         if selected_valor_column_name not in df_input.columns:
-            raise ValueError(f"Coluna de valor selecionada '{selected_valor_column_name}' não encontrada nas colunas lidas: {df_input.columns.tolist()}")
+            raise ValueError(f"Coluna de valor '{selected_valor_column_name}' não encontrada: {df_input.columns.tolist()}")
 
-        # 2. Buscar Colunas Essenciais
-        print("--- Buscando Cols Essenciais ---")
-        col_ident_1 = find_column_flexible(df_input.columns, ['bloco', 'quadra'], 'IDENTIFICADOR 1 (Bloco/Quadra)', required=True)
-        col_ident_2 = find_column_flexible(df_input.columns, ['apt', 'apto', 'apartamento', 'casa', 'unidade'], 'IDENTIFICADOR 2 (Apto/Casa/Unidade)', required=True)
-        col_tipologia = find_column_flexible(df_input.columns, ['tipologia', 'tipo da unidade', 'descricao', 'descrição'], 'TIPOLOGIA', required=True)
-        print("--- Fim Busca Cols ---")
+        # 2. DETECÇÃO DE MODO: Padrão vs. Composto
+        print("--- Verificando modo de operação (Padrão vs. Composto) ---")
+        col_bloco_comp = find_column_flexible(df_input.columns, ['bloco'], 'BLOCO (modo composto)', required=False)
+        col_quadra_comp = find_column_flexible(df_input.columns, ['quadra'], 'QUADRA (modo composto)', required=False)
+        col_casa_comp = find_column_flexible(df_input.columns, ['casa'], 'CASA (modo composto)', required=False)
+        
+        is_composite_mode = all([col_bloco_comp, col_quadra_comp, col_casa_comp])
 
-        # 3. Determinar Prefixos
-        norm_col_ident_1 = normalize_text_for_match(col_ident_1)
-        norm_col_ident_2 = normalize_text_for_match(col_ident_2)
+        if is_composite_mode:
+            print(">>> MODO COMPOSTO DETECTADO (BL-QD-CS).")
+            df_input[col_bloco_comp] = df_input[col_bloco_comp].ffill()
+            df_input[col_quadra_comp] = df_input[col_quadra_comp].ffill()
+            
+            primary_unit_col = col_casa_comp
+            print(f"Linhas antes de dropna em '{primary_unit_col}': {len(df_input)}")
+            df_input = df_input.dropna(subset=[primary_unit_col])
+            df_input = df_input[df_input[primary_unit_col].astype(str).str.strip() != '']
+            df_input = df_input.reset_index(drop=True)
+            print(f"Linhas após dropna em '{primary_unit_col}': {len(df_input)}")
+            if df_input.empty: raise ValueError(f"Nenhuma linha válida encontrada sem valor em '{primary_unit_col}'.")
+            
+            df_output = pd.DataFrame(index=df_input.index)
 
-        # Prefixo para a coluna 'UNIDADE' (ex: "BL" ou "QD")
-        prefixo_unidade_ident_1 = "QD" if 'quadra' in norm_col_ident_1 else "BL"
-        prefixo_unidade_ident_2 = "CASA" if 'casa' in norm_col_ident_2 else "APT"
+            # <<< MODIFICADO >>>
+            # Usa a nova função para formatar a coluna BLOCO
+            df_output['BLOCO'] = df_input[col_bloco_comp].apply(
+                formatar_nome_bloco_saida,
+                prefixo_completo="BLOCO" # No modo composto, o prefixo padrão é sempre BLOCO
+            )
+            # <<< FIM DA MODIFICAÇÃO >>>
 
-        # >>> MODIFICAÇÃO AQUI <<<
-        # Prefixo COMPLETO para a coluna 'BLOCO' de saída (ex: "BLOCO" ou "QUADRA")
-        prefixo_coluna_bloco_completo = "QUADRA" if 'quadra' in norm_col_ident_1 else "BLOCO"
-        print(f"  >> Prefixo para coluna BLOCO de saída determinado: '{prefixo_coluna_bloco_completo}'")
-        # Mantém o log do formato da unidade para clareza
-        print(f"  >> Formato da unidade (interno) determinado: {prefixo_unidade_ident_1}xx - {prefixo_unidade_ident_2} yy")
+            df_output['UNIDADE'] = df_input.apply(
+                formatar_nome_unidade_composto,
+                axis=1,
+                args=(col_bloco_comp, col_quadra_comp, col_casa_comp)
+            )
 
+        else: # MODO PADRÃO
+            print(">>> MODO PADRÃO DETECTADO.")
+            col_ident_1 = find_column_flexible(df_input.columns, ['bloco', 'quadra'], 'IDENTIFICADOR 1 (Bloco/Quadra)', required=True)
+            col_ident_2 = find_column_flexible(df_input.columns, ['apt', 'apto', 'apartamento', 'unidade', 'casa'], 'IDENTIFICADOR 2 (Apto/Casa/Unidade)', required=True)
+            col_tipologia = find_column_flexible(df_input.columns, ['tipologia', 'tipo da unidade', 'descricao', 'descrição'], 'TIPOLOGIA', required=True)
 
-        # 4. Aplicar ffill (Forward Fill) onde apropriado
-        print(f"Aplicando ffill na coluna Identificador 1: '{col_ident_1}'")
-        df_input[col_ident_1] = df_input[col_ident_1].ffill()
-        print(f"Aplicando ffill na coluna Tipologia: '{col_tipologia}'")
-        df_input[col_tipologia] = df_input[col_tipologia].ffill()
+            norm_col_ident_1 = normalize_text_for_match(col_ident_1)
+            norm_col_ident_2 = normalize_text_for_match(col_ident_2)
+            prefixo_unidade_ident_1 = "QD" if 'quadra' in norm_col_ident_1 else "BL"
+            prefixo_unidade_ident_2 = "CASA" if 'casa' in norm_col_ident_2 else "APT"
+            prefixo_coluna_bloco_completo = "QUADRA" if 'quadra' in norm_col_ident_1 else "BLOCO"
+            print(f"  >> Prefixo para coluna BLOCO de saída: '{prefixo_coluna_bloco_completo}'")
+            print(f"  >> Formato da unidade (interno): {prefixo_unidade_ident_1}xx - {prefixo_unidade_ident_2} yy")
 
-        # 5. Remover linhas onde o Identificador 2 (Apto/Casa) é nulo ou vazio
-        print(f"Linhas antes de dropna em '{col_ident_2}': {len(df_input)}")
-        df_input = df_input.dropna(subset=[col_ident_2])
-        df_input = df_input[df_input[col_ident_2].astype(str).str.strip() != '']
-        df_input = df_input.reset_index(drop=True)
-        print(f"Linhas após dropna e filtro de vazio em '{col_ident_2}': {len(df_input)}")
-        if df_input.empty: raise ValueError(f"Nenhuma linha válida encontrada após remover linhas sem valor em '{col_ident_2}'.")
+            df_input[col_ident_1] = df_input[col_ident_1].ffill()
+            df_input[col_tipologia] = df_input[col_tipologia].ffill()
 
+            primary_unit_col = col_ident_2
+            print(f"Linhas antes de dropna em '{primary_unit_col}': {len(df_input)}")
+            df_input = df_input.dropna(subset=[primary_unit_col])
+            df_input = df_input[df_input[primary_unit_col].astype(str).str.strip() != '']
+            df_input = df_input.reset_index(drop=True)
+            print(f"Linhas após dropna em '{primary_unit_col}': {len(df_input)}")
+            if df_input.empty: raise ValueError(f"Nenhuma linha válida encontrada sem valor em '{primary_unit_col}'.")
+            
+            df_output = pd.DataFrame(index=df_input.index)
 
-        # 6. Construir DataFrame de Saída
-        df_output = pd.DataFrame(index=df_input.index)
+            # <<< MODIFICADO >>>
+            # Usa a nova função para formatar a coluna BLOCO
+            df_output['BLOCO'] = df_input[col_ident_1].apply(
+                formatar_nome_bloco_saida,
+                prefixo_completo=prefixo_coluna_bloco_completo
+            )
+            # <<< FIM DA MODIFICAÇÃO >>>
 
-        # Coluna BLOCO (Saída): Contém o NOME COMPLETO (BLOCO/QUADRA) + número formatado
-        # >>> MODIFICAÇÃO AQUI <<<
-        ident_1_numeros = df_input[col_ident_1].fillna('').astype(str).str.extract(r'(\d+)', expand=False).fillna('0').astype(int).apply(lambda x: f"{x:02d}")
-        df_output['BLOCO'] = ident_1_numeros.apply(lambda num: f'="{prefixo_coluna_bloco_completo} {num}"') # Força texto no Excel
+            df_output['UNIDADE'] = df_input.apply(
+                formatar_nome_unidade_generico,
+                axis=1,
+                args=(col_ident_1, col_ident_2, col_tipologia, prefixo_unidade_ident_1, prefixo_unidade_ident_2)
+            )
 
-        # Coluna UNIDADE (Saída): Usa a função genérica com os prefixos curtos
-        df_output['UNIDADE'] = df_input.apply(
-            formatar_nome_unidade_generico,
-            axis=1,
-            args=(col_ident_1, col_ident_2, col_tipologia, prefixo_unidade_ident_1, prefixo_unidade_ident_2) # Passa prefixos curtos
-        )
-
-        # Coluna VALOR DO IMOVEL (Saída)
+        # Processamento Comum para Ambos os Modos
         df_output['VALOR DO IMOVEL'] = df_input[selected_valor_column_name].apply(format_brl)
-
-        # Coluna ETAPA (Saída)
         df_output['ETAPA'] = 'ETAPA 01'
-
-        # 7. Selecionar e Reordenar Colunas Finais
         df_output = df_output[['ETAPA', 'BLOCO', 'UNIDADE', 'VALOR DO IMOVEL']]
 
-        # 8. Filtrar linhas onde a UNIDADE deu erro
-        print(f"Linhas antes de filtrar UNIDADE_ERRO: {len(df_output)}")
-        df_output = df_output[df_output['UNIDADE'] != "UNIDADE_ERRO"]
-        print(f"Linhas após filtrar UNIDADE_ERRO: {len(df_output)}")
+        print(f"Linhas antes de filtrar erros de unidade: {len(df_output)}")
+        df_output = df_output[~df_output['UNIDADE'].str.contains("ERRO", na=False)]
+        print(f"Linhas após filtrar erros de unidade: {len(df_output)}")
         if df_output.empty: raise ValueError("Nenhuma unidade pôde ser formatada corretamente.")
-
-        # 9. Gerar CSV em memória
+        
         output_csv = io.StringIO()
         df_output.to_csv(output_csv, sep=';', encoding='utf-8-sig', index=False, decimal=',', quoting=csv.QUOTE_MINIMAL)
         output_csv.seek(0)
