@@ -71,6 +71,28 @@ if not os.path.exists(app.config['UPLOAD_FOLDER']): os.makedirs(app.config['UPLO
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
+def formatar_bloco_cv(bloco_bruto_valor, nome_coluna_bloco=None):
+    """
+    Formata o nome do bloco para a saída (ex: 'BLOCO 01' ou 'QUADRA 02').
+    - Extrai o número do bloco/quadra.
+    - Determina o prefixo 'BLOCO' ou 'QUADRA' com base no nome da coluna.
+    """
+    valor_str = str(bloco_bruto_valor).strip()
+
+    # Determinar o prefixo (BLOCO ou QUADRA)
+    prefixo = "BLOCO" # Padrão
+    if nome_coluna_bloco and "quadra" in str(nome_coluna_bloco).lower():
+        prefixo = "QUADRA"
+    
+    # Extrair número e formatar
+    match = re.search(r'\d+', valor_str)
+    if match:
+        numero = int(match.group(0))
+        return f"{prefixo} {numero:02d}"
+    else:
+        # Se não encontrar número, retorna o valor original em maiúsculas
+        return valor_str.upper() if valor_str else "BLOCO INDEFINIDO"
+
 def format_decimal_br(value, precision):
     if pd.isna(value):
         return "" # Ou talvez '--' ou 0.0? Depende do que prefere para vazios
@@ -816,49 +838,58 @@ def map_tipologias_cv_route():
 def process_file_cv():
     tool_prefix = 'cv_'
     if f'{tool_prefix}uploaded_filename' not in session: flash('Sessão expirada CV.','error'); return redirect(url_for('importacao_cv_index'))
-    fname=session[f'{tool_prefix}uploaded_filename']; basic=session[f'{tool_prefix}basic_info']; is_casa_session=session.get(f'{tool_prefix}is_casa_project',False); tipos_orig=session.get(f'{tool_prefix}tipos_unicos',[])
+    fname=session[f'{tool_prefix}uploaded_filename']; basic=session[f'{tool_prefix}basic_info']; tipos_orig=session.get(f'{tool_prefix}tipos_unicos',[])
     fpath=os.path.join(app.config['UPLOAD_FOLDER'],fname)
     if not os.path.exists(fpath): flash('Arquivo temp sumiu.','error'); return redirect(url_for('importacao_cv_index'))
+    
     try:
         tip_map={}
+        is_casa_session=session.get(f'{tool_prefix}is_casa_project',False) 
         for t in tipos_orig:
             p,pc,s=request.form.get(f'tipo_{t}_padrao','').strip(), request.form.get(f'tipo_{t}_pcd','').strip(), request.form.get(f'tipo_{t}_superior','').strip() if not is_casa_session else None
             cp,cpc,cs = TIPOLOGIAS_PADRAO.get(p,p or None), TIPOLOGIAS_PCD.get(pc,pc or None), TIPOLOGIAS_SUPERIOR.get(s,s or None) if s is not None else None
             tip_map[t]={'padrao':cp,'pcd':cpc,'superior':cs}
+
         df=pd.read_excel(fpath,engine="openpyxl", dtype=str)
         df.columns=df.columns.str.strip()
         df = df.fillna('')
 
-        # ### INÍCIO DA CORREÇÃO DE ESCOPO CV ###
+        # ### INÍCIO DA NOVA LÓGICA CORRIGIDA ###
         
-        print("Procurando por coluna 'UNIDADE' consolidada...")
-        composite_unit_col = find_column_flexible(df.columns, ['unidade'], 'Unidade Consolidada', required=False)
-        is_casa_project = False # Será definida dentro do if/else
+        # 1. Encontrar a coluna 'UNIDADE', que é a única fonte de dados.
+        print("Buscando a coluna de Unidade consolidada...")
+        unidade_col_orig = find_column_flexible(df.columns, ['unidade'], 'Unidade Consolidada', required=True)
+        print(f"-> Coluna de Unidade encontrada: '{unidade_col_orig}'")
 
-        if composite_unit_col:
-            print(f"Coluna 'UNIDADE' consolidada encontrada: '{composite_unit_col}'.")
-            df.rename(columns={composite_unit_col: "Nome (Unidade)"}, inplace=True)
-            if df["Nome (Unidade)"].str.contains("-CS", na=False, case=False).any():
-                print("Detectado projeto de CASAS pelo formato '-CS' na coluna UNIDADE.")
-                is_casa_project = True
-            else:
-                print("Formato '-CS' não encontrado, tratando como projeto de APARTAMENTOS.")
-                is_casa_project = False
+        # 2. Criar a coluna final 'Nome (Unidade)' (cópia direta).
+        df['Nome (Unidade)'] = df[unidade_col_orig]
 
-        else: # Caminho legado
-            print("Coluna 'UNIDADE' consolidada não encontrada. Buscando colunas separadas...")
-            bloco_quadra_col_name = find_column_flexible(df.columns, ['bloco', 'quadra', 'blk', 'qd'], 'Bloco/Quadra', required=True)
-            casa_apto_col_name = find_column_flexible(df.columns, ['casa', 'apto', 'apt', 'apartamento'], 'Casa/Apto', required=True)
+        # 3. Criar a coluna 'Nome (Bloco)' com base no conteúdo de 'Nome (Unidade)'.
+        def criar_nome_bloco_a_partir_da_unidade(unidade_str):
+            valor_unidade = str(unidade_str).strip().upper()
             
-            if 'casa' in normalize_text(casa_apto_col_name):
-                is_casa_project = True
+            if not valor_unidade:
+                return "BLOCO INDEFINIDO"
+            
+            # Regra 1: Se a unidade começa com 'US', é uma Unidade Solta.
+            if valor_unidade.startswith('US'):
+                return "UNID. SOLTAS"
+            
+            # Regra 2: Caso contrário, extrai a primeira parte (ex: 'BL09') e formata.
+            primeira_parte = valor_unidade.split('-')[0]
+            # Usa a função auxiliar para formatar 'BL09' para 'BLOCO 09' ou 'QD03' para 'QUADRA 03'
+            return formatar_bloco_cv(primeira_parte, nome_coluna_bloco=primeira_parte)
 
-            df["Nome (Unidade)"] = df.apply(
-                lambda r: formatar_nome_unidade(r, bq_col_name=bloco_quadra_col_name, ca_col_name=casa_apto_col_name),
-                axis=1
-            )
-        # ### FIM DA CORREÇÃO DE ESCOPO CV ###
+        df['Nome (Bloco)'] = df['Nome (Unidade)'].apply(criar_nome_bloco_a_partir_da_unidade)
+        print("Colunas 'Nome (Unidade)' e 'Nome (Bloco)' criadas a partir da coluna de origem.")
 
+        # 4. Determinar se é um projeto de casa para o mapeamento de tipologia.
+        is_casa_project = df['Nome (Unidade)'].str.contains('CS', case=False, na=False).any()
+        print(f"Projeto detectado como de CASAS: {is_casa_project}")
+        
+        # ### FIM DA NOVA LÓGICA CORRIGIDA ###
+
+        # O resto do processamento continua normalmente...
         n_cols={normalize_text(c):c for c in df.columns}; t_col=n_cols.get("TIPO")
         if t_col and t_col.upper()!='TIPO': df.rename(columns={t_col:"TIPO"},inplace=True)
         elif "TIPO" not in df.columns: raise ValueError("Coluna TIPO sumiu.")
@@ -871,7 +902,8 @@ def process_file_cv():
         col_map_fix={"Endereço":"Endereço (Empreendimento)","CEP":"CEP (Empreendimento)","Região":"Região (Empreendimento)","Bairro":"Bairro (Empreendimento)","Número":"Número (Empreendimento)","Estado":"Estado (Empreendimento)","Cidade":"Cidade (Empreendimento)","Data da Entrega (Empreendimento)":"Data da Entrega (Empreendimento)"}
         for k,v in ENDERECO_FIXO.items():
             if k in col_map_fix: df[col_map_fix[k]]=v
-        df["Matrícula (Empreendimento)"]="XXXXX"; df["Ativo no painel (Empreendimento)"]="Ativo"; df["Nome (Etapa)"]="ETAPA 01"; df["Nome (Bloco)"]="BLOCO 01"; df["Ativo no painel (Unidade)"]="Ativo"
+        
+        df["Matrícula (Empreendimento)"]="XXXXX"; df["Ativo no painel (Empreendimento)"]="Ativo"; df["Nome (Etapa)"]="ETAPA 01"; df["Ativo no painel (Unidade)"]="Ativo"
         
         v_num_mode=basic.get('vaga_por_numero')=='on'
         df["Vagas de garagem (Unidade)"]=df[g_col].apply(lambda x: verificar_vaga(x, v_num_mode)) if g_col else "01 VAGA"
@@ -898,6 +930,7 @@ def process_file_cv():
         session.pop(f'{tool_prefix}uploaded_filename',None); session.pop(f'{tool_prefix}basic_info',None); session.pop(f'{tool_prefix}tipos_unicos',None); session.pop(f'{tool_prefix}is_casa_project',None)
         out_fname=f"importacao_cv_{basic.get('Sigla','output')}.csv"
         return send_file(io.BytesIO(output.getvalue().encode('utf-8-sig')),mimetype='text/csv',as_attachment=True,download_name=out_fname)
+    
     except Exception as e:
         flash(f'Erro CV Process: {e}','error'); print(f"Err CV Proc: {e}"); traceback.print_exc()
         if 'fpath' in locals() and os.path.exists(fpath): os.remove(fpath)
