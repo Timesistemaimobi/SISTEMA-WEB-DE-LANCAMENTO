@@ -285,7 +285,7 @@ def processar_incorporacao_web(input_filepath_or_stream):
         if not processed_data: raise ValueError("Nenhum dado válido extraído.")
         df_final = pd.DataFrame(processed_data)
         print("--- Formatando Colunas Numéricas ---")
-        cols_to_format_final = {'ÁREA CONSTRUIDA': 2, 'QUINTAL': 2, 'GARAGEM': 2, 'ÁREA PRIVATIVA': 2, 'FRAÇÃO IDEAL': 9}
+        cols_to_format_final = {'ÁREA CONSTRUIDA': 2, 'QUINTAL': 2, 'GARAGEM': 2, 'ÁREA PRIVATIVA': 2, 'FRAÇÃO IDEAL': 6}
         for col_name, precision in cols_to_format_final.items():
             if col_name in df_final.columns:
                 df_final[col_name] = df_final[col_name].apply(lambda x: format_decimal_br(x, precision))

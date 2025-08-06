@@ -364,8 +364,14 @@ def formatar_nome_unidade_lote(row, col_q, col_l):
         return f"{qd_s} - {lt_s}"
     except: return "ERRO_NOME_UNIDADE"
 def formatar_fracao_ideal_lote(v_num):
-    try: return "" if pd.isna(v_num) else str(float(v_num)).replace('.',',')
-    except: return "ERRO_FRAC"
+    try:
+        if pd.isna(v_num):
+            return ""
+        # Formata o número para exatamente 6 casas decimais e substitui o ponto
+        return f"{float(v_num):.6f}".replace('.', ',')
+    except (ValueError, TypeError):
+        # Retorna o valor original em caso de erro de conversão
+        return str(v_num) if pd.notna(v_num) else "ERRO_FRAC"
 def formatar_area_privativa_lote(v_num):
     try: return "" if pd.isna(v_num) else f"{float(v_num):.2f}".replace('.',',')+" m²"
     except: return "ERRO m²"
@@ -1198,7 +1204,7 @@ def process_file_sienge_lote():
         df_out['TIPO DE IMÓVEL']="LOTE"
         df_out['ESTOQUE COMERCIAL']='D'; df_out['ESTOQUE LEGAL']='L'; df_out['ESTOQUE DE OBRA']='C'
         output=io.BytesIO(); wb=xlwt.Workbook(encoding='utf-8'); sheet=wb.add_sheet("Dados")
-        style_a=xlwt.XFStyle(); style_a.num_format_str='0.00'; style_e=xlwt.XFStyle(); style_e.num_format_str='0'; style_f=xlwt.XFStyle(); style_f.num_format_str='0.00000000'; def_s=xlwt.Style.default_style
+        style_a=xlwt.XFStyle(); style_a.num_format_str='0.00'; style_e=xlwt.XFStyle(); style_e.num_format_str='0'; style_f=xlwt.XFStyle(); style_f.num_format_str='0.000000'; def_s=xlwt.Style.default_style
         try: col_idx={n:i for i,n in enumerate(df_out.columns)}; emp_i,area_i,frac_i = col_idx.get('EMPREENDIMENTO'),col_idx.get('ÁREA PRIVATIVA'),col_idx.get('FRAÇÃO IDEAL')
         except: emp_i=area_i=frac_i=None
         for c,h in enumerate(df_out.columns): sheet.write(0,c,h)
