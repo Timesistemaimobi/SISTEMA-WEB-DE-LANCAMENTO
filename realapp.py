@@ -583,7 +583,7 @@ def processar_formatador_incorporacao_avancado(input_filepath):
                 'quintal': '0.00',
                 'areadescobertafrontal': '0.00', # Precisa ter essa coluna no header da linha 3
                 'areaprivativa': '0.00', # Formato visual 'XXX,XX' não existe, 0.00 dá 2 casas
-                'fracaoideal': '0.00000' # 5 casas decimais
+                'fracaoideal': '0.000000' # 6 casas decimais
             }
             # Mapeamento de nome normalizado para nome real no DataFrame FINAL
             df_cols_normalized = {normalize_text_for_match(col): col for col in df_proc.columns}
@@ -618,17 +618,18 @@ def processar_formatador_incorporacao_avancado(input_filepath):
                     cell = worksheet_out.cell(row=row_idx, column=col_idx_1based)
                     # Tenta converter valor para float ANTES de aplicar formato
                     try:
-                        numeric_value = parse_flexible_float(cell.value) # Usa a função importada
+                        numeric_value = parse_flexible_float(cell.value)
                         if numeric_value is not None:
-                           cell.value = numeric_value # Garante que o valor na célula é numérico
-                           cell.number_format = fmt_str
-                        elif str(cell.value).strip() == '': # Se for vazio após parse, deixa vazio
-                             cell.value = None
-                        # Se não for conversível, mantém o valor original (string) sem formato
+                            # Se a coluna for 'fracaoideal', arredonda o VALOR antes de formatar
+                            if norm_name == 'fracaoideal':
+                                cell.value = round(numeric_value, 6)
+                            else:
+                                cell.value = numeric_value
+                            cell.number_format = fmt_str
+                        elif str(cell.value).strip() == '':
+                            cell.value = None
                     except Exception as e_fmt:
-                        # Debug: Ajuda a entender por que falhou
-                        # print(f"  Debug format error R{row_idx}C{col_idx_1based} Val:'{cell.value}' Err:{e_fmt}")
-                        pass # Mantém valor original se parse_flexible_float falhar
+                        pass
 
             # Ajusta largura das colunas
             print("(Incorp Reestruturado) Ajustando largura das colunas...")
@@ -758,7 +759,11 @@ def processar_formatador_lote_web(input_filepath):
         if not dados_proc: raise ValueError("Nenhum dado de lote encontrado.")
         df_final=pd.DataFrame(dados_proc); df_final['ETAPA']=1
         total_a=df_final['_area_numerica'].sum()
-        df_final['FRAÇÃO IDEAL']=df_final['_area_numerica']/total_a if total_a>0 else 0.0
+        if total_a > 0:
+            fracao_calculada = df_final['_area_numerica'] / total_a
+            df_final['FRAÇÃO IDEAL'] = fracao_calculada.round(6)
+        else:
+            df_final['FRAÇÃO IDEAL'] = 0.0
         df_final=df_final.drop(columns=['_area_numerica'])
         if cabecalho:
             orig_ord=[h for h in cabecalho if h in df_final.columns and h not in ['QUADRA','ETAPA','CONFRONTANTES','FRAÇÃO IDEAL']]
@@ -916,7 +921,13 @@ def process_file_cv():
         df["Área privativa m² (Unidade)"] = df[area_const_col_name].apply(lambda x: format_decimal_br_cv(x, precision=2)) if area_const_col_name else ""
         
         fracao_col_name = find_column_flexible(df.columns, ['fracaoideal', 'fração ideal'], 'Fração Ideal', required=False)
-        df["Fração Ideal (Unidade)"] = df[fracao_col_name].apply(lambda x: format_decimal_br_cv(x, precision=9)) if fracao_col_name else ""
+        if fracao_col_name:
+            # Converte para numérico, arredonda para 6 casas e depois formata para o padrão BR
+            numeric_fracao = df[fracao_col_name].apply(parse_flexible_float)
+            rounded_fracao = numeric_fracao.round(6)
+            df["Fração Ideal (Unidade)"] = rounded_fracao.apply(lambda x: format_decimal_br_cv(x, precision=6))
+        else:
+            df["Fração Ideal (Unidade)"] = ""
         
         df["Tipo (Unidade)"]=df["TIPO"].astype(str).fillna('')
         df["Tipologia (Unidade)"]=df.apply(lambda r: mapear_tipologia_web(r, tip_map, is_casa_project), axis=1)
@@ -968,7 +979,9 @@ def importacao_cv_lote_tool():
             df["Nome (Bloco)"]=df.apply(lambda r: formatar_nome_bloco_lote(r,col_q=cols_found["QUADRA"]),axis=1)
             df["Nome (Unidade)"]=df.apply(lambda r: formatar_nome_unidade_lote(r,col_q=cols_found["QUADRA"],col_l=cols_found["LOTE"]),axis=1)
             a_num=df[cols_found["ÁREA(M2)"]].apply(limpar_converter_numerico_lote); df["Área privativa m² (Unidade)"]=a_num.apply(formatar_area_privativa_lote)
-            f_num=df[cols_found["FRAÇÃO IDEAL"]].apply(limpar_converter_numerico_lote); df["Fração Ideal (Unidade)"]=f_num.apply(formatar_fracao_ideal_lote)
+            f_num=df[cols_found["FRAÇÃO IDEAL"]].apply(limpar_converter_numerico_lote)
+            f_num_rounded = f_num.round(6) # Arredonda para 6 casas decimais
+            df["Fração Ideal (Unidade)"]=f_num_rounded.apply(formatar_fracao_ideal_lote)
             df["Tipo (Unidade)"]=df[cols_found["TIPO"]].astype(str).fillna(''); df["Descrição do Lote (Unidade)"]=df[cols_found["CONFRONTANTES"]].astype(str).fillna('')
             cols_out=["Nome (Empreendimento)","Sigla (Empreendimento)","Matrícula (Empreendimento)","Empresa (Empreendimento)","Tipo (Empreendimento)","Segmento (Empreendimento)","Ativo no painel (Empreendimento)","Região (Empreendimento)","CEP (Empreendimento)","Endereço (Empreendimento)","Bairro (Empreendimento)","Número (Empreendimento)","Estado (Empreendimento)","Cidade (Empreendimento)","Data da Entrega (Empreendimento)","Nome (Etapa)","Nome (Bloco)","Nome (Unidade)","Área privativa m² (Unidade)","Ativo no painel (Unidade)","Fração Ideal (Unidade)","Tipo (Unidade)","Descrição do Lote (Unidade)"]
             missing_out=[c for c in cols_out if c not in df.columns];
@@ -1086,7 +1099,7 @@ def process_file_sienge():
         # O resto do processamento é comum a ambos os caminhos
         df_out['ÁREA PRIVATIVA']=pd.to_numeric(df['ÁREA CONSTRUIDA'],errors='coerce').fillna(0)
         df_out['ÁREA COMUM']=0
-        df_out['FRAÇÃO IDEAL']=pd.to_numeric(df['FRAÇÃO IDEAL'],errors='coerce').fillna(0)
+        df_out['FRAÇÃO IDEAL']=pd.to_numeric(df['FRAÇÃO IDEAL'],errors='coerce').fillna(0).round(6)
         df_out['ESTOQUE COMERCIAL']='D'; df_out['ESTOQUE LEGAL']='L'; df_out['ESTOQUE DE OBRA']='C'
         # ### FIM DA CORREÇÃO LÓGICA SIENGE ###
 
@@ -1180,7 +1193,8 @@ def process_file_sienge_lote():
         df_out=pd.DataFrame(); df_out['EMPREENDIMENTO']=df['EMPREENDIMENTO_CODIGO']
         df_out['UNIDADE']=df.apply(lambda r: formatar_unidade_sienge_lote(r,col_q,col_l),axis=1)
         df_out['ÁREA PRIVATIVA']=df[col_a].apply(limpar_converter_numerico_sienge_lote)
-        df_out['ÁREA COMUM']=0; df_out['FRAÇÃO IDEAL']=df[col_f].apply(limpar_converter_numerico_sienge_lote)
+        df_out['ÁREA COMUM']=0
+        df_out['FRAÇÃO IDEAL']=df[col_f].apply(limpar_converter_numerico_sienge_lote).round(6)
         df_out['TIPO DE IMÓVEL']="LOTE"
         df_out['ESTOQUE COMERCIAL']='D'; df_out['ESTOQUE LEGAL']='L'; df_out['ESTOQUE DE OBRA']='C'
         output=io.BytesIO(); wb=xlwt.Workbook(encoding='utf-8'); sheet=wb.add_sheet("Dados")
