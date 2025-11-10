@@ -3368,10 +3368,17 @@ def desformatador_tabela_precos_tool():
 
         # A função retorna um DataFrame do pandas
         df_limpo = desformatar_tabela_precos(file_stream)
+        print(f"(Desformatador Rota) DataFrame limpo tem {len(df_limpo)} linhas")
+        
+        # Importa e aplica cálculo de VGV
+        from formatadores.tabela_desformatador import calcular_vgv
+        print("(Desformatador Rota) Calculando VGV...")
+        df_com_vgv = calcular_vgv(df_limpo)
+        print(f"(Desformatador Rota) DataFrame com VGV tem {len(df_com_vgv)} linhas")
 
         # Prepara a saída como CSV
         output_csv = io.StringIO()
-        df_limpo.to_csv(
+        df_com_vgv.to_csv(
             output_csv,
             sep=";",
             encoding="utf-8-sig",

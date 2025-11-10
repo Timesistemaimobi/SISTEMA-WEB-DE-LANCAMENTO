@@ -88,6 +88,74 @@ def extract_number_from_string(text):
         except ValueError: return None
     return None
 
+def parse_brl_to_float(value):
+    """Converte valor em formato BRL para float"""
+    if pd.isna(value) or str(value).strip() == '':
+        return 0.0
+    s_val = str(value).replace('R$', '').strip()
+    s_val = s_val.replace('.', '').replace(',', '.')
+    try:
+        return float(s_val)
+    except:
+        return 0.0
+
+def calcular_vgv(df):
+    """Calcula VGV por tipologia e VGV total, adicionando ao final do DataFrame"""
+    print(f"(calcular_vgv) Iniciando cálculo. DataFrame tem {len(df)} linhas e colunas: {df.columns.tolist()}")
+    
+    # Identifica coluna de tipologia e valor
+    col_tipologia = None
+    col_valor = None
+    
+    for col in df.columns:
+        col_norm = normalize_text_simple(col)
+        if 'tipologia' in col_norm:
+            col_tipologia = col
+            print(f"(calcular_vgv) Coluna tipologia encontrada: '{col}'")
+        if 'valor' in col_norm and 'imovel' in col_norm:
+            col_valor = col
+            print(f"(calcular_vgv) Coluna valor encontrada: '{col}'")
+    
+    if not col_tipologia or not col_valor:
+        print(f"(calcular_vgv) AVISO: Colunas não encontradas. Tipologia={col_tipologia}, Valor={col_valor}")
+        return df
+    
+    # Calcula VGV por tipologia
+    df['_valor_num'] = df[col_valor].apply(parse_brl_to_float)
+    vgv_por_tipo = df.groupby(col_tipologia)['_valor_num'].sum()
+    vgv_total = df['_valor_num'].sum()
+    print(f"(calcular_vgv) VGV Total calculado: {vgv_total}")
+    print(f"(calcular_vgv) VGV por tipo: {vgv_por_tipo.to_dict()}")
+    
+    # Remove coluna auxiliar
+    df = df.drop('_valor_num', axis=1)
+    
+    # Adiciona linhas vazias e VGV
+    linhas_vgv = []
+    linhas_vgv.append({col: '' for col in df.columns})  # Linha vazia
+    linhas_vgv.append({col: '' for col in df.columns})  # Linha vazia
+    
+    # VGV por tipologia
+    for tipo, valor in vgv_por_tipo.items():
+        linhas_vgv.append({
+            col_tipologia: f'VGV {tipo}',
+            col_valor: format_brl(valor),
+            **{col: '' for col in df.columns if col not in [col_tipologia, col_valor]}
+        })
+    
+    # VGV Total
+    linhas_vgv.append({
+        col_tipologia: 'VGV TOTAL',
+        col_valor: format_brl(vgv_total),
+        **{col: '' for col in df.columns if col not in [col_tipologia, col_valor]}
+    })
+    
+    print(f"(calcular_vgv) Adicionando {len(linhas_vgv)} linhas de VGV")
+    df_vgv = pd.DataFrame(linhas_vgv)
+    resultado = pd.concat([df, df_vgv], ignore_index=True)
+    print(f"(calcular_vgv) DataFrame final tem {len(resultado)} linhas")
+    return resultado
+
 # --- Função Principal do Desformatador (MODIFICADA PARA FORMATAR MOEDA) ---
 def desformatar_tabela_precos(input_file_object):
     """
@@ -149,6 +217,7 @@ def desformatar_tabela_precos(input_file_object):
         df_final = pd.DataFrame(processed_data)
         # Limpa colunas que podem ter sido criadas mas ficaram totalmente vazias
         df_final.dropna(axis=1, how='all', inplace=True)
+        
         print("DataFrame final criado com sucesso.")
         return df_final
 
