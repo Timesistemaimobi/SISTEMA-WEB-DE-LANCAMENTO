@@ -3257,6 +3257,11 @@ def formatador_unidades_bloqueadas_tool_processar():
                     "Nomes das colunas de empreendimento ou motivo não encontrados na sessão."
                 )
 
+            # Configura a base selecionada
+            base_selecionada = request.form.get('base_api', 'VCA')
+            from formatadores.tabela_unidades_bloqueadas import set_base
+            set_base(base_selecionada)
+            
             output_excel_stream = processar_unidades_bloqueadas_csv(
                 df_input_reloaded,  # DataFrame com placeholders aplicados
                 col_empreendimento_input,

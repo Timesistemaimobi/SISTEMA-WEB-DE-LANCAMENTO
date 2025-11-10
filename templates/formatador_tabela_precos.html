@@ -68,7 +68,8 @@ title %}Formatar Tabela de Preços{% endblock %} {% block styles %} {{ super() }
     color: var(--text-secondary);
     margin-top: 5px;
   }
-  input[type="file"]#arquivo_entrada {
+  input[type="file"]#arquivo_entrada,
+  input[type="file"]#arquivo_formatado {
     /* Esconde o input padrão, a label fará o trabalho */
     opacity: 0;
     position: absolute;
@@ -77,7 +78,8 @@ title %}Formatar Tabela de Preços{% endblock %} {% block styles %} {{ super() }
     overflow: hidden;
     z-index: -1;
   }
-  #file-name-display {
+  #file-name-display,
+  #file-name-display-desformatar {
     /* Para mostrar o nome do arquivo selecionado */
     margin-top: 10px;
     font-size: 0.9em;
@@ -248,20 +250,22 @@ title %}Formatar Tabela de Preços{% endblock %} {% block styles %} {{ super() }
 
 <BR></BR>
 
-    {# --- NOVA SEÇÃO DE DESFORMATAR --- #}
-    <h1>Desformatar Tabela de Preços</h1>
-    <div class="description">
-      <p><strong>Instruções (Desformatar):</strong> Faça o upload de uma Tabela de Preços já estilizada (o arquivo .xlsx gerado pela ferramenta acima) para extrair os dados puros em um formato de tabela simples (CSV).</p>
+    {# --- SEÇÃO DE FORMATADOR GESTÃO --- #}
+    <h1>Formatador Gestão</h1>
+    <div class="tool-description">
+      <p><strong>Instruções:</strong> Faça o upload de uma Tabela de Preços já estilizada (o arquivo .xlsx gerado pela ferramenta acima) para extrair os dados puros em um formato de tabela simples (CSV).</p>
     </div>
-    <div class="form-container">
-        <form method="post" enctype="multipart/form-data" action="{{ url_for('desformatador_tabela_precos_tool') }}"> {# <<< NOVA ROTA #}
-             <div class="mb-3">
-                <label for="arquivo_formatado" class="form-label"><strong>Selecione a Tabela Formatada (.xlsx):</strong></label>
-                <input type="file" class="form-control" id="arquivo_formatado" name="arquivo_formatado" accept=".xlsx" required />
+    <div class="form-upload-container">
+        <form method="post" enctype="multipart/form-data" action="{{ url_for('desformatador_tabela_precos_tool') }}" id="desformatar-form">
+             <div class="file-upload-area" onclick="document.getElementById('arquivo_formatado').click();">
+                <label for="arquivo_formatado" class="form-label"><strong>Selecione a Tabela Formatada</strong></label>
+                <input type="file" id="arquivo_formatado" name="arquivo_formatado" accept=".xlsx" required />
+                <div class="file-upload-instructions">(.xlsx)</div>
+                <div id="file-name-display-desformatar">Nenhum arquivo selecionado</div>
              </div>
-             <div style="text-align: center; margin-top: 30px;">
-                <button type="submit" class="btn btn-warning btn-lg"> {# Botão com cor diferente #}
-                    <i class="fas fa-undo-alt me-2"></i> Desformatar e Extrair Dados
+             <div class="submit-button-container">
+                <button type="submit" class="btn btn-warning btn-lg">
+                    <i class="fas fa-undo-alt"></i> Desformatar e Extrair Dados
                 </button>
             </div>
         </form>
@@ -272,12 +276,12 @@ title %}Formatar Tabela de Preços{% endblock %} {% block styles %} {{ super() }
   document.addEventListener("DOMContentLoaded", function () {
     const fileInput = document.getElementById("arquivo_entrada");
     const csvOptionsDiv = document.getElementById("csv-options");
-    const fileNameDisplay = document.getElementById("file-name-display"); // Elemento para mostrar nome
+    const fileNameDisplay = document.getElementById("file-name-display");
 
     if (fileInput && csvOptionsDiv && fileNameDisplay) {
       fileInput.addEventListener("change", function () {
         const filename = fileInput.value.toLowerCase();
-        const justFileName = fileInput.value.split(/(\\|\/)/g).pop(); // Pega só o nome do arquivo
+        const justFileName = fileInput.value.split(/(\\|\/)/g).pop();
 
         if (justFileName) {
           fileNameDisplay.textContent = justFileName;
@@ -291,10 +295,21 @@ title %}Formatar Tabela de Preços{% endblock %} {% block styles %} {{ super() }
           csvOptionsDiv.style.display = "none";
         }
       });
-    } else {
-      console.error(
-        "Elementos de UI (input, opções CSV ou display de nome) não encontrados."
-      );
+    }
+    
+    // Script para o desformatador
+    const fileInputDesformatar = document.getElementById("arquivo_formatado");
+    const fileNameDisplayDesformatar = document.getElementById("file-name-display-desformatar");
+    
+    if (fileInputDesformatar && fileNameDisplayDesformatar) {
+      fileInputDesformatar.addEventListener("change", function () {
+        const justFileName = fileInputDesformatar.value.split(/(\\|\/)/g).pop();
+        if (justFileName) {
+          fileNameDisplayDesformatar.textContent = justFileName;
+        } else {
+          fileNameDisplayDesformatar.textContent = "Nenhum arquivo selecionado";
+        }
+      });
     }
   });
 </script>

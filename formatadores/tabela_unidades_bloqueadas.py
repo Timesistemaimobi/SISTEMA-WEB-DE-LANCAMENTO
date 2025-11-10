@@ -17,14 +17,37 @@ from openpyxl.utils import get_column_letter
 from openpyxl.worksheet.table import Table, TableStyleInfo  # Para Tabelas do Excel
 from openpyxl import Workbook  # Para criar Excel de mensagem de erro
 
-# Credenciais da API
-API_HEADERS = {
-    "accept": "application/json",
-    "email": "carlos.mauricio@vcaconstrutora.com.br",
-    "token": "b3eb66cff818914ff41d0e538301727f3345fdd6",
+# Configurações de API por base
+API_CONFIGS = {
+    "VCA": {
+        "base_url": "https://vca.cvcrm.com.br",
+        "token": "b3eb66cff818914ff41d0e538301727f3345fdd6"
+    },
+    "VCALOTEAR": {
+        "base_url": "https://vcalotear.cvcrm.com.br",
+        "token": "5cffba38895c77862e6a206533d36ec5447e2b10"
+    }
 }
-API_BASE_URL_CVBOT = "https://vca.cvcrm.com.br/api/v1/cvbot"
-API_BASE_URL_CVIO = "https://vca.cvcrm.com.br/api/v1/cvio"
+
+_current_base = "VCA"
+
+def get_api_headers():
+    return {
+        "accept": "application/json",
+        "email": "carlos.mauricio@vcaconstrutora.com.br",
+        "token": API_CONFIGS[_current_base]["token"]
+    }
+
+def get_base_url():
+    return API_CONFIGS[_current_base]["base_url"]
+
+def set_base(base_name):
+    global _current_base
+    if base_name in API_CONFIGS:
+        _current_base = base_name
+        _cache_empreendimentos.clear()
+    else:
+        raise ValueError(f"Base '{base_name}' não configurada")
 
 
 # --- Funções Auxiliares (find_column_flexible, normalize_text_for_match) ---
@@ -104,9 +127,9 @@ def find_column_flexible(df_columns, concept_keywords, concept_name, required=Tr
 
 def buscar_empreendimentos_api():
     """Busca todos os empreendimentos da API e retorna um dicionário {nome: id}"""
-    url = f"{API_BASE_URL_CVBOT}/empreendimentos"
+    url = f"{get_base_url()}/api/v1/cvbot/empreendimentos"
     try:
-        response = requests.get(url, headers=API_HEADERS)
+        response = requests.get(url, headers=get_api_headers())
         response.raise_for_status()
         empreendimentos = response.json()
         return {emp["nome"].strip(): emp["idempreendimento"] for emp in empreendimentos}
@@ -125,9 +148,12 @@ def buscar_dados_empreendimento(id_empreendimento):
         return _cache_empreendimentos[id_empreendimento]
 
     try:
+        base_url = get_base_url()
+        headers = get_api_headers()
+        
         # Passo 1: Busca lista de tabelas ativas
-        url_tabelas = f"https://vca.cvcrm.com.br/api/v1/cadastros/empreendimentos/{id_empreendimento}/tabelasdepreco"
-        response = requests.get(url_tabelas, headers=API_HEADERS, timeout=10)
+        url_tabelas = f"{base_url}/api/v1/cadastros/empreendimentos/{id_empreendimento}/tabelasdepreco"
+        response = requests.get(url_tabelas, headers=headers, timeout=10)
 
         if response.status_code != 200 or not response.text.strip():
             _cache_empreendimentos[id_empreendimento] = []
@@ -142,8 +168,8 @@ def buscar_dados_empreendimento(id_empreendimento):
         todas_tabelas_dados = []
         for tabela in tabelas:
             id_tabela = tabela.get("idtabela")
-            url_precos = f"https://vca.cvcrm.com.br/api/v1/cv/tabelasdepreco?idempreendimento={id_empreendimento}&idtabela={id_tabela}"
-            response_precos = requests.get(url_precos, headers=API_HEADERS, timeout=10)
+            url_precos = f"{base_url}/api/v1/cv/tabelasdepreco?idempreendimento={id_empreendimento}&idtabela={id_tabela}"
+            response_precos = requests.get(url_precos, headers=headers, timeout=10)
 
             if response_precos.status_code == 200 and response_precos.text.strip():
                 dados_precos = response_precos.json()
@@ -168,6 +194,21 @@ def buscar_valor_e_vigencia_tabela_preco(id_empreendimento, unidade):
     todas_tabelas = buscar_dados_empreendimento(id_empreendimento)
     if not todas_tabelas:
         return None, None
+
+    # --- INÍCIO DA MODIFICAÇÃO ---
+    # Ordena as tabelas pela 'data_vigencia_de' em ordem decrescente (mais recente primeiro).
+    # Isso garante que a primeira tabela encontrada com a unidade será a mais atual.
+    # A conversão para datetime assegura a ordenação correta das datas em formato string.
+    try:
+        todas_tabelas.sort(
+            key=lambda t: pd.to_datetime(t.get("data_vigencia_de"), errors="coerce"),
+            reverse=True,
+        )
+    except Exception as e:
+        print(
+            f"AVISO: Falha ao ordenar tabelas por data de vigência para empreendimento {id_empreendimento}. Erro: {e}"
+        )
+    # --- FIM DA MODIFICAÇÃO ---
 
     unidade_normalizada = normalize_text_for_match(str(unidade))
 

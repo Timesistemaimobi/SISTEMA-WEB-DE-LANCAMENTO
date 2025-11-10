@@ -1,0 +1,13 @@
+﻿            output_excel_stream = processar_unidades_bloqueadas_csv(
+                df_input_reloaded,  # DataFrame com placeholders aplicados
+                col_empreendimento_input,
+                col_motivo_input,
+                placeholder_vazio,
+                empreendimentos_a_ignorar,
+                motivos_a_ignorar,
+                buscar_precos=True,  # Habilita busca de preços da API
+            )
+
+            output_filename = f"filtrado_unidades_bloqueadas_{os.path.splitext(original_filename)[0]}.xlsx"
+
+            # Limpa a sessão principal ANTES de enviar o arquivo

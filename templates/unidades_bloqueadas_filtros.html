@@ -32,6 +32,18 @@ endblock %} {% block content %}
         #}
       >
         <div class="row">
+          <div class="col-md-12 mb-4">
+            <h4 class="section-subtitle">
+              <i class="fas fa-database"></i> Base de Dados:
+            </h4>
+            <select class="form-select" name="base_api" id="base_api" required>
+              <option value="VCA" selected>VCA</option>
+              <option value="VCALOTEAR">VCALOTEAR</option>
+            </select>
+          </div>
+        </div>
+        
+        <div class="row">
           <div class="col-md-6 mb-4">
             <div class="d-flex justify-content-between align-items-center mb-2">
               {# Wrapper para título e botão #}
