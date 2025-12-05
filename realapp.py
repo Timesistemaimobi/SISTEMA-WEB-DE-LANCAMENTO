@@ -2388,7 +2388,7 @@ def formatador_tabela_precos_upload():
 
             # Certifique-se que find_column_flexible e extract_block_number_safe estão disponíveis/importadas
             bloco_col_name = find_column_flexible(
-                df_check.columns, ["bloco", "blk", "quadra"], "BLOCO", required=True
+                df_check.columns, ["bloco", "blk", "quadra", "pavimento"], "BLOCO", required=True
             )
             unique_blocks_raw = (
                 df_check[bloco_col_name]
