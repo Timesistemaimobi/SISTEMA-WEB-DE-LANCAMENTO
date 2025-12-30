@@ -115,7 +115,9 @@ def formatar_bloco_cv(bloco_bruto_valor, nome_coluna_bloco=None):
 
     # Determinar o prefixo (BLOCO ou QUADRA)
     prefixo = "BLOCO"  # Padrão
-    if nome_coluna_bloco and "quadra" in str(nome_coluna_bloco).lower():
+    if "QD" in valor_str.upper():
+        prefixo = "QUADRA"
+    elif nome_coluna_bloco and "quadra" in str(nome_coluna_bloco).lower():
         prefixo = "QUADRA"
 
     # Extrair número e formatar
@@ -417,7 +419,16 @@ def formatar_jardim(v):
 def mapear_tipologia_web(row, tip_map, is_casa):
     t_orig = str(row.get("TIPO", "")).strip()
     map_i = tip_map.get(t_orig, {})
+
+    # Tenta pegar de colunas específicas ou extrair de Nome (Unidade)
     unit = str(row.get("APT", "") or row.get("CASA", "")).strip().upper()
+    if not unit and "Nome (Unidade)" in row:
+        parts = str(row["Nome (Unidade)"]).split("-")
+        if len(parts) > 1:
+            unit = parts[-1].strip().upper()
+        else:
+            unit = str(row["Nome (Unidade)"]).strip().upper()
+
     if not t_orig or not map_i:
         return None
     is_pcd = "PCD" in unit or "PCD" in normalize_text(t_orig)
@@ -1343,42 +1354,95 @@ def process_file_cv():
 
         # ### INÍCIO DA NOVA LÓGICA CORRIGIDA ###
 
-        # 1. Encontrar a coluna 'UNIDADE', que é a única fonte de dados.
+        # 1. Tenta encontrar a coluna 'UNIDADE' consolidada.
         print("Buscando a coluna de Unidade consolidada...")
         unidade_col_orig = find_column_flexible(
-            df.columns, ["unidade"], "Unidade Consolidada", required=True
+            df.columns, ["unidade", "unid"], "Unidade Consolidada", required=False
         )
-        print(f"-> Coluna de Unidade encontrada: '{unidade_col_orig}'")
 
-        # 2. Criar a coluna final 'Nome (Unidade)' (cópia direta).
-        df["Nome (Unidade)"] = df[unidade_col_orig]
+        # 2. Tenta encontrar colunas separadas para composição
+        bloco_col_orig = find_column_flexible(
+            df.columns, ["bloco", "quadra", "qd", "blk"], "Bloco/Quadra", required=False
+        )
+        casa_col_orig = find_column_flexible(
+            df.columns, ["casa"], "Casa", required=False
+        )
+        apt_col_orig = find_column_flexible(
+            df.columns, ["apt", "apto", "apartamento"], "Apartamento", required=False
+        )
+        unidade_sep_col = casa_col_orig or apt_col_orig
 
-        # 3. Criar a coluna 'Nome (Bloco)' com base no conteúdo de 'Nome (Unidade)'.
+        # Função auxiliar para criar nome do bloco a partir da unidade consolidada
         def criar_nome_bloco_a_partir_da_unidade(unidade_str):
             valor_unidade = str(unidade_str).strip().upper()
-
             if not valor_unidade:
                 return "BLOCO INDEFINIDO"
-
-            # Regra 1: Se a unidade começa com 'US', é uma Unidade Solta.
             if valor_unidade.startswith("US"):
                 return "UNID. SOLTAS"
-
-            # Regra 2: Caso contrário, extrai a primeira parte (ex: 'BL09') e formata.
             primeira_parte = valor_unidade.split("-")[0]
-            # Usa a função auxiliar para formatar 'BL09' para 'BLOCO 09' ou 'QD03' para 'QUADRA 03'
             return formatar_bloco_cv(primeira_parte, nome_coluna_bloco=primeira_parte)
 
-        df["Nome (Bloco)"] = df["Nome (Unidade)"].apply(
-            criar_nome_bloco_a_partir_da_unidade
-        )
-        print(
-            "Colunas 'Nome (Unidade)' e 'Nome (Bloco)' criadas a partir da coluna de origem."
-        )
+        if unidade_col_orig and not (bloco_col_orig and unidade_sep_col):
+            # CASO 1: Unidade Consolidada encontrada
+            print(f"-> Coluna de Unidade encontrada: '{unidade_col_orig}'")
+            df["Nome (Unidade)"] = df[unidade_col_orig]
+            df["Nome (Bloco)"] = df["Nome (Unidade)"].apply(
+                criar_nome_bloco_a_partir_da_unidade
+            )
+
+        elif bloco_col_orig and unidade_sep_col:
+            # CASO 2: Colunas separadas encontradas (Composição)
+            print(
+                f"-> Colunas separadas encontradas: '{bloco_col_orig}' e '{unidade_sep_col}'"
+            )
+
+            def formatar_unidade_composta_cv(row):
+                b_val = str(row[bloco_col_orig]).strip()
+                u_val = str(row[unidade_sep_col]).strip()
+                b_match = re.search(r"\d+", b_val)
+                b_num = f"{int(b_match.group(0)):02d}" if b_match else "00"
+                u_match = re.search(r"\d+", u_val)
+                u_num = f"{int(u_match.group(0)):02d}" if u_match else "00"
+
+                # Regras solicitadas
+                if casa_col_orig:
+                    return f"QD{b_num} - CASA {u_num}"
+                else:
+                    return f"BL{b_num} - APT {u_num}"
+
+            df["Nome (Unidade)"] = df.apply(formatar_unidade_composta_cv, axis=1)
+
+            def formatar_bloco_sep(row):
+                val = str(row[bloco_col_orig]).strip()
+                num_int = extract_block_number_safe(val)
+                num = f"{num_int:02d}" if num_int is not None else "00"
+                if (
+                    casa_col_orig
+                    or "quadra" in str(bloco_col_orig).lower()
+                    or "QD" in val.upper()
+                ):
+                    return f"QUADRA {num}"
+                else:
+                    return f"BLOCO {num}"
+
+            df["Nome (Bloco)"] = df.apply(formatar_bloco_sep, axis=1)
+
+        elif unidade_col_orig:
+            # Fallback para consolidada se separadas falharem
+            print(f"-> Coluna de Unidade encontrada (fallback): '{unidade_col_orig}'")
+            df["Nome (Unidade)"] = df[unidade_col_orig]
+            df["Nome (Bloco)"] = df["Nome (Unidade)"].apply(
+                criar_nome_bloco_a_partir_da_unidade
+            )
+        else:
+            raise ValueError(
+                "Não foi possível encontrar colunas de unidade (Unidade Consolidada ou Bloco/Quadra + Casa/Apt)."
+            )
 
         # 4. Determinar se é um projeto de casa para o mapeamento de tipologia.
         is_casa_project = (
             df["Nome (Unidade)"].str.contains("-CS", case=False, na=False).any()
+            or df["Nome (Unidade)"].str.contains("CASA", case=False, na=False).any()
         )
         print(f"Projeto detectado como de CASAS: {is_casa_project}")
 
@@ -2388,7 +2452,10 @@ def formatador_tabela_precos_upload():
 
             # Certifique-se que find_column_flexible e extract_block_number_safe estão disponíveis/importadas
             bloco_col_name = find_column_flexible(
-                df_check.columns, ["bloco", "blk", "quadra", "pavimento"], "BLOCO", required=True
+                df_check.columns,
+                ["bloco", "blk", "quadra", "pavimento"],
+                "BLOCO",
+                required=True,
             )
             unique_blocks_raw = (
                 df_check[bloco_col_name]
@@ -3258,10 +3325,11 @@ def formatador_unidades_bloqueadas_tool_processar():
                 )
 
             # Configura a base selecionada
-            base_selecionada = request.form.get('base_api', 'VCA')
+            base_selecionada = request.form.get("base_api", "VCA")
             from formatadores.tabela_unidades_bloqueadas import set_base
+
             set_base(base_selecionada)
-            
+
             output_excel_stream = processar_unidades_bloqueadas_csv(
                 df_input_reloaded,  # DataFrame com placeholders aplicados
                 col_empreendimento_input,
@@ -3369,9 +3437,10 @@ def desformatador_tabela_precos_tool():
         # A função retorna um DataFrame do pandas
         df_limpo = desformatar_tabela_precos(file_stream)
         print(f"(Desformatador Rota) DataFrame limpo tem {len(df_limpo)} linhas")
-        
+
         # Importa e aplica cálculo de VGV
         from formatadores.tabela_desformatador import calcular_vgv
+
         print("(Desformatador Rota) Calculando VGV...")
         df_com_vgv = calcular_vgv(df_limpo)
         print(f"(Desformatador Rota) DataFrame com VGV tem {len(df_com_vgv)} linhas")
