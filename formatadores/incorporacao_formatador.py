@@ -155,6 +155,69 @@ def extract_and_format_number(value_str, default_if_error="XX"):
     return default_if_error
 
 
+def verificar_vaga(g, num_mode):
+    if pd.isna(g) or str(g).strip() == "":
+        return "01 VAGA"
+
+    if num_mode:
+        s = str(g).strip()
+        n = 0
+        if s:
+            # Check for multiple vagas separated by "e" or ","
+            for sep in [" e ", ","]:
+                if sep in s:
+                    n = len([v for v in s.split(sep) if v.strip()])
+                    break
+            else:
+                # If no separator, try to extract the first number from the string
+                match = re.search(r"(\d+)", s)
+                if match:
+                    try:
+                        n = int(match.group(1))
+                    except ValueError:
+                        n = 1  # Fallback if parsing fails
+                else:
+                    n = 1  # Fallback if no digits found at all
+
+        if n >= 4:
+            return "04 VAGAS"
+        elif n == 3:
+            return "03 VAGAS"
+        elif n == 2:
+            return "02 VAGAS"
+        else:  # Handles n=1, n=0, and any other case
+            return "01 VAGA"
+    else:  # "Smart" mode
+        try:
+            # Try to parse as a number. This handles "2", "2.0", "15.5", "15,5"
+            # It will fail for "2 VAGAS" or "1 e 2"
+            gn = float(str(g).replace(",", ".").strip())
+
+            # Check if it's likely an area (metragem) because it has decimals
+            if abs(gn - int(gn)) > 0.001:
+                if gn > 35:
+                    return "04 VAGAS"
+                elif gn > 25:
+                    return "03 VAGAS"
+                elif gn > 15:
+                    return "02 VAGAS"
+                else:
+                    return "01 VAGA"
+            else:
+                gi = int(gn)
+                if gi >= 4:
+                    return "04 VAGAS"
+                elif gi == 3:
+                    return "03 VAGAS"
+                elif gi == 2:
+                    return "02 VAGAS"
+                else:
+                    return "01 VAGA"
+        except (ValueError, TypeError):
+            # If it's not a number (e.g., "02 VAGAS", "01 e 02"), use the text-based logic (num_mode=True)
+            return verificar_vaga(g, True)
+
+
 def processar_incorporacao_web(input_filepath_or_stream):
     """
     Processa planilha de incorporação.
@@ -213,6 +276,7 @@ def processar_incorporacao_web(input_filepath_or_stream):
             "ÁREA CONSTRUIDA": (["areaconstruida", "área construída"], False),
             "QUINTAL": (["quintal"], False),
             "GARAGEM": (["garagem", "garagem e frontal"], False),
+            "VAGAS_QTD": (["vagas de garagem", "vagas"], False),
             "ÁREA PRIVATIVA": (["areaprivativa", "área privativa"], False),
             "FRAÇÃO IDEAL": (["fracaoideal", "fração ideal"], False),
         }
@@ -342,6 +406,26 @@ def processar_incorporacao_web(input_filepath_or_stream):
                     else ""
                 )
 
+                # LÓGICA DE VAGAS DE GARAGEM
+                vagas_final_str = "01 VAGA"  # Padrão
+                vagas_qtd_idx = col_map.get("VAGAS_QTD")
+                garagem_area_idx = col_map.get("GARAGEM")
+
+                vagas_source_val = None
+                if (
+                    vagas_qtd_idx is not None
+                    and str(row.get(vagas_qtd_idx, "")).strip()
+                ):
+                    vagas_source_val = row[vagas_qtd_idx]
+                elif (
+                    garagem_area_idx is not None
+                    and str(row.get(garagem_area_idx, "")).strip()
+                ):
+                    vagas_source_val = row[garagem_area_idx]
+
+                if vagas_source_val is not None:
+                    vagas_final_str = verificar_vaga(vagas_source_val, num_mode=False)
+
                 processed_data.append(
                     {
                         "UNIDADE": unit_id_final,
@@ -349,6 +433,7 @@ def processar_incorporacao_web(input_filepath_or_stream):
                         "ÁREA CONSTRUIDA": area_const_val,
                         "QUINTAL": quintal_val,
                         "GARAGEM": garagem_val,
+                        "VAGAS DE GARAGEM": vagas_final_str,
                         "ÁREA PRIVATIVA": area_priv_val,
                         "FRAÇÃO IDEAL": fracao_val,
                         "ETAPA": "01",
@@ -451,6 +536,26 @@ def processar_incorporacao_web(input_filepath_or_stream):
                     else ""
                 )
 
+                # LÓGICA DE VAGAS DE GARAGEM
+                vagas_final_str = "01 VAGA"  # Padrão
+                vagas_qtd_idx = col_map.get("VAGAS_QTD")
+                garagem_area_idx = col_map.get("GARAGEM")
+
+                vagas_source_val = None
+                if (
+                    vagas_qtd_idx is not None
+                    and str(row.get(vagas_qtd_idx, "")).strip()
+                ):
+                    vagas_source_val = row[vagas_qtd_idx]
+                elif (
+                    garagem_area_idx is not None
+                    and str(row.get(garagem_area_idx, "")).strip()
+                ):
+                    vagas_source_val = row[garagem_area_idx]
+
+                if vagas_source_val is not None:
+                    vagas_final_str = verificar_vaga(vagas_source_val, num_mode=False)
+
                 processed_data.append(
                     {
                         header_saida_bloco_quadra: ultimo_bloco_num_str,
@@ -459,6 +564,7 @@ def processar_incorporacao_web(input_filepath_or_stream):
                         "ÁREA CONSTRUIDA": area_const_val,
                         "QUINTAL": quintal_val,
                         "GARAGEM": garagem_val,
+                        "VAGAS DE GARAGEM": vagas_final_str,
                         "ÁREA PRIVATIVA": area_priv_val,
                         "FRAÇÃO IDEAL": fracao_val,
                         "ETAPA": "01",
@@ -490,6 +596,7 @@ def processar_incorporacao_web(input_filepath_or_stream):
                 "ÁREA CONSTRUIDA",
                 "QUINTAL",
                 "GARAGEM",
+                "VAGAS DE GARAGEM",
                 "ÁREA PRIVATIVA",
                 "FRAÇÃO IDEAL",
                 "ETAPA",
@@ -502,6 +609,7 @@ def processar_incorporacao_web(input_filepath_or_stream):
                 "ÁREA CONSTRUIDA",
                 "QUINTAL",
                 "GARAGEM",
+                "VAGAS DE GARAGEM",
                 "ÁREA PRIVATIVA",
                 "FRAÇÃO IDEAL",
                 "ETAPA",
@@ -527,7 +635,15 @@ def processar_incorporacao_web(input_filepath_or_stream):
                 "ÁREA PRIVATIVA": "0.00",
                 "FRAÇÃO IDEAL": "0.000000000",
             }
-            text_columns = ["UNIDADE", "TIPO", "BLOCO", "QUADRA", "CASA", "APT"]
+            text_columns = [
+                "UNIDADE",
+                "TIPO",
+                "BLOCO",
+                "QUADRA",
+                "CASA",
+                "APT",
+                "VAGAS DE GARAGEM",
+            ]
             for row_idx in range(2, worksheet.max_row + 1):
                 for col_idx_1based in range(1, worksheet.max_column + 1):
                     cell = worksheet.cell(row=row_idx, column=col_idx_1based)

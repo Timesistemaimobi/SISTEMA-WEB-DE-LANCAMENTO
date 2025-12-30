@@ -146,6 +146,11 @@ title %}Formatador de Incorporação{% endblock %} {% block styles %} {{ super()
         Remove o cabeçalho original dos dados, se detectado acima dos dados
         reais.
       </li>
+      <li>
+        Processa <b>Vagas de Garagem</b>: usa a coluna "VAGAS DE GARAGEM" se
+        existir; caso contrário, calcula a quantidade baseada na área ("GARAGEM"
+        ou "GARAGEM E FRONTAL").
+      </li>
       <li>Salva o resultado em um novo arquivo <b>.xlsx</b> formatado.</li>
     </ul>
   </div>

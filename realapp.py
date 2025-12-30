@@ -360,30 +360,45 @@ def formatar_nome_unidade(row, bq_col_name, ca_col_name):
 
 
 def verificar_vaga(g, num_mode):
-    if pd.isna(g):
+    if pd.isna(g) or str(g).strip() == "":
         return "01 VAGA"
+
     if num_mode:
         s = str(g).strip()
         n = 0
         if s:
+            # Check for multiple vagas separated by "e" or ","
             for sep in [" e ", ","]:
                 if sep in s:
                     n = len([v for v in s.split(sep) if v.strip()])
                     break
             else:
-                n = 1
+                # If no separator, try to extract the first number from the string
+                match = re.search(r"(\d+)", s)
+                if match:
+                    try:
+                        n = int(match.group(1))
+                    except ValueError:
+                        n = 1  # Fallback if parsing fails
+                else:
+                    n = 1  # Fallback if no digits found at all
+
         if n >= 4:
             return "04 VAGAS"
         elif n == 3:
             return "03 VAGAS"
         elif n == 2:
             return "02 VAGAS"
-        else:
+        else:  # Handles n=1, n=0, and any other case
             return "01 VAGA"
-    else:
+    else:  # "Smart" mode
         try:
+            # Try to parse as a number. This handles "2", "2.0", "15.5", "15,5"
+            # It will fail for "2 VAGAS" or "1 e 2"
             gn = float(str(g).replace(",", ".").strip())
-            if abs(gn - int(gn)) > 0.001:  # Metragem
+
+            # Check if it's likely an area (metragem) because it has decimals
+            if abs(gn - int(gn)) > 0.001:
                 if gn > 35:
                     return "04 VAGAS"
                 elif gn > 25:
@@ -392,7 +407,9 @@ def verificar_vaga(g, num_mode):
                     return "02 VAGAS"
                 else:
                     return "01 VAGA"
-            else:  # Int
+
+            # It's an integer value, so it's a quantity
+            else:
                 gi = int(gn)
                 if gi >= 4:
                     return "04 VAGAS"
@@ -402,7 +419,8 @@ def verificar_vaga(g, num_mode):
                     return "02 VAGAS"
                 else:
                     return "01 VAGA"
-        except:
+        except (ValueError, TypeError):
+            # If it's not a number (e.g., "02 VAGAS", "01 e 02"), use the text-based logic (num_mode=True)
             return verificar_vaga(g, True)
 
 
@@ -809,6 +827,36 @@ def processar_formatador_incorporacao_avancado(input_filepath):
         print(
             f"(Incorp Reestruturado) Coluna '{quadra_col_name}' criada a partir de '{quadra_col_orig_name}'."
         )
+
+        # --- LÓGICA DE VAGAS DE GARAGEM ---
+        col_vagas_qtd = find_column_flexible(
+            df_proc.columns, ["vagas de garagem", "vagas"], "VAGAS_QTD", required=False
+        )
+        col_vagas_area = find_column_flexible(
+            df_proc.columns,
+            ["garagem", "garagem e frontal", "area de garagem"],
+            "VAGAS_AREA",
+            required=False,
+        )
+
+        target_vagas_col = "VAGAS DE GARAGEM"
+
+        if col_vagas_qtd:
+            print(
+                f"(Incorp Reestruturado) Usando coluna explícita de vagas: '{col_vagas_qtd}'"
+            )
+            # Usa a coluna existente para definir a quantidade (formatação inteligente/numérica)
+            df_proc[target_vagas_col] = df_proc[col_vagas_qtd].apply(
+                lambda x: verificar_vaga(x, num_mode=False)
+            )
+        elif col_vagas_area:
+            print(
+                f"(Incorp Reestruturado) Calculando vagas pela área da coluna: '{col_vagas_area}'"
+            )
+            # Usa a coluna de área para calcular a quantidade
+            df_proc[target_vagas_col] = df_proc[col_vagas_area].apply(
+                lambda x: verificar_vaga(x, num_mode=False)
+            )
 
         # 4. Reordenar Colunas (QUADRA_NUM primeiro)
         # Garante que a coluna original 'QUADRA' não seja duplicada se tiver o mesmo nome normalizado
@@ -1456,10 +1504,36 @@ def process_file_cv():
         elif "TIPO" not in df.columns:
             raise ValueError("Coluna TIPO sumiu.")
 
-        g_col = encontrar_coluna_garagem(df.columns)
-        if g_col:
-            df.rename(columns={g_col: "GARAGEM_ORIG"}, inplace=True)
-            g_col = "GARAGEM_ORIG"
+        # --- LÓGICA DE VAGAS DE GARAGEM (Atualizada) ---
+        col_vagas_qtd = find_column_flexible(
+            df.columns,
+            ["vagas de garagem", "vagas", "n vagas", "numero de vagas", "qtd vagas"],
+            "VAGAS_QTD",
+            required=False,
+        )
+        col_garagem_area = find_column_flexible(
+            df.columns,
+            ["garagem", "area de garagem", "box", "garagem e frontal", "area garagem"],
+            "GARAGEM_AREA",
+            required=False,
+        )
+
+        # Resolução de conflito: se ambas encontraram a mesma coluna
+        if col_vagas_qtd and col_garagem_area and col_vagas_qtd == col_garagem_area:
+            norm_col = normalize_text_for_match(col_vagas_qtd)
+            if "vaga" in norm_col or "numero" in norm_col or "qtd" in norm_col:
+                col_garagem_area = None  # É quantidade
+            else:
+                col_vagas_qtd = None  # É área
+
+        if col_vagas_qtd:
+            df.rename(columns={col_vagas_qtd: "VAGAS_QTD_ORIG"}, inplace=True)
+            col_vagas_qtd = "VAGAS_QTD_ORIG"
+
+        if col_garagem_area:
+            # Se eram colunas diferentes, renomeia a de área também
+            df.rename(columns={col_garagem_area: "GARAGEM_AREA_ORIG"}, inplace=True)
+            col_garagem_area = "GARAGEM_AREA_ORIG"
 
         col_map_ui = {
             "Nome do Empreendimento": "Nome (Empreendimento)",
@@ -1489,17 +1563,24 @@ def process_file_cv():
         df["Nome (Etapa)"] = "ETAPA 01"
         df["Ativo no painel (Unidade)"] = "Ativo"
 
-        v_num_mode = basic.get("vaga_por_numero") == "on"
-        df["Vagas de garagem (Unidade)"] = (
-            df[g_col].apply(lambda x: verificar_vaga(x, v_num_mode))
-            if g_col
-            else "01 VAGA"
-        )
-        df["Área de Garagem (Unidade)"] = (
-            df[g_col].apply(lambda x: format_decimal_br_cv(x, precision=2))
-            if g_col
-            else ""
-        )
+        # Prioridade: VAGAS_QTD > GARAGEM_AREA (calculado)
+        if col_vagas_qtd:
+            df["Vagas de garagem (Unidade)"] = df[col_vagas_qtd].apply(
+                lambda x: verificar_vaga(x, num_mode=False)
+            )
+        elif col_garagem_area:
+            df["Vagas de garagem (Unidade)"] = df[col_garagem_area].apply(
+                lambda x: verificar_vaga(x, num_mode=False)
+            )
+        else:
+            df["Vagas de garagem (Unidade)"] = "01 VAGA"
+
+        if col_garagem_area:
+            df["Área de Garagem (Unidade)"] = df[col_garagem_area].apply(
+                lambda x: format_decimal_br_cv(x, precision=2)
+            )
+        else:
+            df["Área de Garagem (Unidade)"] = ""
 
         quintal_col_name = find_column_flexible(
             df.columns, ["quintal", "jardim"], "Quintal/Jardim", required=False
