@@ -2559,10 +2559,19 @@ def formatador_tabela_precos_upload():
 
             print(f"(Tabela Preços Upload) Blocos únicos: {unique_blocks}")
 
+            # --- Extrair todas as colunas para permitir seleção do usuário ---
+            all_columns = df_check.columns.tolist()
+            # Identificação prévia para UI (Opcional, apenas para feedback visual se quisermos)
+            # Vamos passar apenas a lista crua e deixar o usuário decidir.
+
             # --- Armazena na sessão e redireciona ---
-            session_data = {"filename": filename, "unique_blocks": unique_blocks}
+            session_data = {
+                "filename": filename,
+                "unique_blocks": unique_blocks,
+                "all_columns": all_columns # <<< Nova info na sessão
+            }
             session[session_key] = session_data
-            print("DEBUG: Saindo - Sucesso POST, redirecionando para map_etapas")
+            print(f"DEBUG: Saindo - Sucesso POST, redirecionando para map_etapas. Colunas: {len(all_columns)}")
             return redirect(url_for("formatador_tabela_precos_map_etapas"))
 
         except ValueError as ve:
@@ -2619,9 +2628,8 @@ def formatador_tabela_precos_map_etapas():
 
     session_data = session[session_key]
     temp_filename = session_data["filename"]
-    unique_blocks = session_data[
-        "unique_blocks"
-    ]  # Usado no GET e para pegar names no POST
+    unique_blocks = session_data["unique_blocks"]  # Usado no GET e para pegar names no POST
+    all_columns = session_data.get("all_columns", []) # <<< Recupera colunas
     temp_filepath = os.path.join(app.config["UPLOAD_FOLDER"], temp_filename)
 
     if not os.path.exists(temp_filepath):
@@ -2643,6 +2651,20 @@ def formatador_tabela_precos_map_etapas():
         print(
             f"(Tabela Preços Mapeamento) Montando mapeamento a partir do form POST..."
         )
+        
+        # <<< Recupera colunas selecionadas >>>
+        # O frontend deve enviar uma lista ordenada de inputs com name="selected_columns"
+        selected_columns_order = request.form.getlist("selected_columns")
+        print(f"(Tabela Preços Mapeamento) Colunas selecionadas pelo usuário: {selected_columns_order}")
+        
+        # <<< Recupera formatações manuais do usuário >>>
+        column_format_map = {}
+        for col in selected_columns_order:
+            format_value = request.form.get(f"format_{col}", "none")
+            if format_value and format_value != "none":
+                column_format_map[col] = format_value
+        print(f"(Tabela Preços Mapeamento) Formatações manuais: {column_format_map}")
+
         for block_name_original in unique_blocks:
             stage_assigned = (
                 request.form.get(f"stage_for_{block_name_original}", "").strip().upper()
@@ -2674,7 +2696,8 @@ def formatador_tabela_precos_map_etapas():
 
             # Chama a função de processamento
             print(f"(Tabela Preços Mapeamento) Chamando processar_tabela_precos_web...")
-            output_stream = processar_tabela_precos_web(temp_filepath, block_mapping)
+            # MODIFICADO: Passa selected_columns_order e column_format_map
+            output_stream = processar_tabela_precos_web(temp_filepath, block_mapping, selected_columns_order, column_format_map)
             print(
                 f"(Tabela Preços Mapeamento) Processamento concluído. Preparando envio..."
             )
@@ -2753,6 +2776,7 @@ def formatador_tabela_precos_map_etapas():
             "map_etapas_blocos.html",
             active_page="formatador_tabela_precos",
             unique_blocks=unique_blocks,  # Passa a lista para o template renderizar os blocos pendentes
+            all_columns=all_columns, # <<< Passa as colunas para o template
         )
 
 

@@ -254,15 +254,32 @@ def processar_preco_incorporacao(input_filepath, selected_valor_column_name):
         try:
             df_input = pd.read_excel(input_filepath, engine='openpyxl', header=header_row, dtype=str)
             df_input = df_input.dropna(how='all').reset_index(drop=True)
-            df_input = df_input.dropna(axis=1, how='all')
+            # df_input = df_input.dropna(axis=1, how='all') # REMOVIDO: Isso removia a coluna de valor se ela estivesse vazia (ex: planilha modelo)
         except Exception as e_read:
             raise ValueError(f"Falha ao ler Excel (linha cabeçalho={header_row}). Verifique o arquivo.") from e_read
 
         if df_input.empty: raise ValueError("Arquivo vazio ou sem dados após leitura inicial.")
         print(f"(Preço Incorporação) Lidas {len(df_input)} linhas válidas.")
         df_input.columns = df_input.columns.str.strip(); print(f"Colunas: {df_input.columns.tolist()}")
+        # 2. Busca Flexível se a coluna selecionada não for encontrada
         if selected_valor_column_name not in df_input.columns:
-            raise ValueError(f"Coluna de valor '{selected_valor_column_name}' não encontrada: {df_input.columns.tolist()}")
+            print(f"(Preço Incorporação) Aviso: Coluna selecionada '{selected_valor_column_name}' não encontrada. Buscando alternativa contendo 'valor'...")
+            alternatives = [c for c in df_input.columns if 'valor' in str(c).lower()]
+            if alternatives:
+                print(f"(Preço Incorporação) Alternativas encontradas: {alternatives}")
+                # Prioriza 'Valor do imóvel padrão' se existir nas alternativas, senão pega a primeira
+                selected_valor_column_name = next((c for c in alternatives if 'imóvel padrão' in str(c).lower()), alternatives[0])
+                print(f"(Preço Incorporação) Usando coluna alternativa: '{selected_valor_column_name}'")
+            else:
+                # Se não encontrar nada, cria uma coluna vazia para não quebrar o processo
+                print("(Preço Incorporação) AVISO CRÍTICO: Nenhuma coluna de valor encontrada. Criando coluna vazia.")
+                # Usa o nome original solicitado ou um genérico
+                if not selected_valor_column_name: selected_valor_column_name = "Valor do imóvel padrão"
+                df_input[selected_valor_column_name] = ""
+
+        # Garante que a coluna existe no DataFrame final (mesmo que vazia)
+        if selected_valor_column_name not in df_input.columns:
+             df_input[selected_valor_column_name] = ""
 
         # 2. DETECÇÃO DE MODO: Padrão vs. Composto
         print("--- Verificando modo de operação (Padrão vs. Composto) ---")
@@ -311,7 +328,11 @@ def processar_preco_incorporacao(input_filepath, selected_valor_column_name):
             norm_col_ident_2 = normalize_text_for_match(col_ident_2)
             prefixo_unidade_ident_1 = "QD" if 'quadra' in norm_col_ident_1 else "BL"
             prefixo_unidade_ident_2 = "CASA" if 'casa' in norm_col_ident_2 else "APT"
+            
+            # <<< MODIFICAÇÃO: Define o nome da coluna de saída baseado no input >>>
+            # Se a coluna original encontrada contiver 'quadra', o cabeçalho de saída será 'QUADRA'
             prefixo_coluna_bloco_completo = "QUADRA" if 'quadra' in norm_col_ident_1 else "BLOCO"
+            
             print(f"  >> Prefixo para coluna BLOCO de saída: '{prefixo_coluna_bloco_completo}'")
             print(f"  >> Formato da unidade (interno): {prefixo_unidade_ident_1}xx - {prefixo_unidade_ident_2} yy")
 
