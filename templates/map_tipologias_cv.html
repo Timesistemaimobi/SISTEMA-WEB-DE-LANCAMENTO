@@ -1,5 +1,12 @@
 {% extends "base.html" %} {% block title %}Mapeamento Tipologias - CV{%
-endblock%} {% block styles %} {% endblock %} {% block content %}
+endblock%} {% block styles %} 
+<style>
+  /* Remove o hover da tabela de mapeamento */
+  tbody tr:hover {
+    background-color: transparent !important;
+  }
+</style>
+{% endblock %} {% block content %}
 <h1>Mapeamento de Tipologias - Importação CV</h1>
 <p>
   Projeto detectado como:

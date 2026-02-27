@@ -582,7 +582,6 @@ def processar_incorporacao_web(input_filepath_or_stream):
             "QUINTAL": 2,
             "GARAGEM": 2,
             "ÁREA PRIVATIVA": 2,
-            "FRAÇÃO IDEAL": 6,
         }
         for col_name, precision in cols_to_format_final.items():
             if col_name in df_final.columns:
@@ -633,7 +632,6 @@ def processar_incorporacao_web(input_filepath_or_stream):
                 "QUINTAL": "0.00",
                 "GARAGEM": "0.00",
                 "ÁREA PRIVATIVA": "0.00",
-                "FRAÇÃO IDEAL": "0.000000000",
             }
             text_columns = [
                 "UNIDADE",

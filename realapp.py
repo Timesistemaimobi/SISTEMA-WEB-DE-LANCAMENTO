@@ -552,10 +552,11 @@ def formatar_nome_unidade_lote(row, col_q, col_l):
 
 def formatar_fracao_ideal_lote(v_num):
     try:
-        if pd.isna(v_num):
+        if pd.isna(v_num) or str(v_num).strip() == "":
             return ""
-        # Formata o número para exatamente 6 casas decimais e substitui o ponto
-        return f"{float(v_num):.6f}".replace(".", ",")
+        # Formata o número preservando a precisão sem restringir a 6 casas, limpa zeros à direita
+        formatted = f"{float(v_num):.12f}".rstrip("0").rstrip(".") if "." in f"{float(v_num):.12f}" else f"{float(v_num):.12f}"
+        return formatted.replace(".", ",")
     except (ValueError, TypeError):
         # Retorna o valor original em caso de erro de conversão
         return str(v_num) if pd.notna(v_num) else "ERRO_FRAC"
@@ -1405,7 +1406,7 @@ def process_file_cv():
         # 1. Tenta encontrar a coluna 'UNIDADE' consolidada.
         print("Buscando a coluna de Unidade consolidada...")
         unidade_col_orig = find_column_flexible(
-            df.columns, ["unidade", "unid"], "Unidade Consolidada", required=False
+            df.columns, ["unidade", "unid", "apt", "apto", "apartamento", "casa"], "Unidade Consolidada", required=False
         )
 
         # 2. Tenta encontrar colunas separadas para composição
@@ -1433,7 +1434,50 @@ def process_file_cv():
         if unidade_col_orig and not (bloco_col_orig and unidade_sep_col):
             # CASO 1: Unidade Consolidada encontrada
             print(f"-> Coluna de Unidade encontrada: '{unidade_col_orig}'")
-            df["Nome (Unidade)"] = df[unidade_col_orig]
+
+            def formatar_consolidada_caso_1(row, col_name):
+                val = str(row.get(col_name, "")).strip().upper()
+                if not val:
+                    return ""
+                
+                tipo_val = str(row.get("TIPO", "")).upper()
+                is_pcd = "PCD" in val or "PNE" in val or "PCD" in tipo_val or "PNE" in tipo_val
+                pcd_sufixo = " (PCD)" if is_pcd else ""
+
+                if val.startswith("US"):
+                    nums = re.findall(r'\d+', val)
+                    num = f"{int(nums[0]):02d}" if nums else "00"
+                    return f"US {num}{pcd_sufixo}"
+
+                norm_col = normalize_text_for_match(str(col_name))
+                is_apt_col = any(k in norm_col for k in ["apt", "apto", "apartamento"])
+                is_casa_col = "casa" in norm_col
+
+                nums = re.findall(r'\d+', val)
+                is_casa_context = is_casa_col or "CASA" in val or "CS" in val or "QD" in val
+
+                if len(nums) >= 2:
+                    b_num = f"{int(nums[0]):02d}"
+                    u_num = f"{int(nums[1]):02d}"
+                    if is_casa_context:
+                        return f"QD{b_num} - CASA {u_num}{pcd_sufixo}"
+                    else:
+                        return f"BL{b_num} - APT {u_num}{pcd_sufixo}"
+                elif len(nums) == 1:
+                    u_num = f"{int(nums[0]):02d}"
+                    letters_only = re.sub(r'[^A-Z]', '', val)
+                    
+                    if not letters_only or is_apt_col or is_casa_col:
+                        if is_casa_context:
+                            return f"QD01 - CASA {u_num}{pcd_sufixo}"
+                        else:
+                            return f"BL01 - APT {u_num}{pcd_sufixo}"
+                
+                return f"{val}{pcd_sufixo}" if pcd_sufixo and not val.endswith("(PCD)") else val
+
+            df["Nome (Unidade)"] = df.apply(
+                lambda r: formatar_consolidada_caso_1(r, unidade_col_orig), axis=1
+            )
             df["Nome (Bloco)"] = df["Nome (Unidade)"].apply(
                 criar_nome_bloco_a_partir_da_unidade
             )
@@ -1452,11 +1496,18 @@ def process_file_cv():
                 u_match = re.search(r"\d+", u_val)
                 u_num = f"{int(u_match.group(0)):02d}" if u_match else "00"
 
+                # Validações de PCD usando coluna tipo caso houver
+                is_pcd = False
+                tipo_val = str(row.get("TIPO", "")).upper()
+                if "PCD" in b_val.upper() or "PCD" in u_val.upper() or "PCD" in tipo_val or "PNE" in tipo_val:
+                    is_pcd = True
+                pcd_sufixo = " (PCD)" if is_pcd else ""
+
                 # Regras solicitadas
                 if casa_col_orig:
-                    return f"QD{b_num} - CASA {u_num}"
+                    return f"QD{b_num} - CASA {u_num}{pcd_sufixo}"
                 else:
-                    return f"BL{b_num} - APT {u_num}"
+                    return f"BL{b_num} - APT {u_num}{pcd_sufixo}"
 
             df["Nome (Unidade)"] = df.apply(formatar_unidade_composta_cv, axis=1)
 
@@ -1607,12 +1658,16 @@ def process_file_cv():
             df.columns, ["fracaoideal", "fração ideal"], "Fração Ideal", required=False
         )
         if fracao_col_name:
-            # Converte para numérico, arredonda para 6 casas e depois formata para o padrão BR
+            def format_unrestricted_fraction(x):
+                if pd.isna(x): return ""
+                try:
+                    fmt = f"{float(x):.12f}".rstrip("0").rstrip(".") if "." in f"{float(x):.12f}" else f"{float(x):.12f}"
+                    return fmt.replace(".", ",")
+                except:
+                    return str(x)
+                    
             numeric_fracao = df[fracao_col_name].apply(parse_flexible_float)
-            rounded_fracao = numeric_fracao.round(6)
-            df["Fração Ideal (Unidade)"] = rounded_fracao.apply(
-                lambda x: format_decimal_br_cv(x, precision=6)
-            )
+            df["Fração Ideal (Unidade)"] = numeric_fracao.apply(format_unrestricted_fraction)
         else:
             df["Fração Ideal (Unidade)"] = ""
 
@@ -1782,8 +1837,7 @@ def importacao_cv_lote_tool():
                 formatar_area_privativa_lote
             )
             f_num = df[cols_found["FRAÇÃO IDEAL"]].apply(limpar_converter_numerico_lote)
-            f_num_rounded = f_num.round(6)  # Arredonda para 6 casas decimais
-            df["Fração Ideal (Unidade)"] = f_num_rounded.apply(
+            df["Fração Ideal (Unidade)"] = f_num.apply(
                 formatar_fracao_ideal_lote
             )
             df["Tipo (Unidade)"] = df[cols_found["TIPO"]].astype(str).fillna("")
@@ -2020,7 +2074,7 @@ def process_file_sienge():
         ).fillna(0)
         df_out["ÁREA COMUM"] = 0
         df_out["FRAÇÃO IDEAL"] = (
-            pd.to_numeric(df["FRAÇÃO IDEAL"], errors="coerce").fillna(0).round(6)
+            pd.to_numeric(df["FRAÇÃO IDEAL"], errors="coerce").fillna(0)
         )
         df_out["ESTOQUE COMERCIAL"] = "D"
         df_out["ESTOQUE LEGAL"] = "L"
